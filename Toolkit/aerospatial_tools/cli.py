@@ -14,6 +14,8 @@ from .digest import create_digest, verify_digest
 from .quality_gate import QualityThresholds, evaluate
 from .simulation import generate
 from .validation import validate
+from .bus_events import InvalidBusEvent, read_bus_envelopes
+from .bus_audit import BusAudit
 from .events import InvalidSession
 from .memory_storage import SpatialMemory
 from .memory_models import Observation
@@ -57,12 +59,19 @@ def main(argv: list[str] | None = None) -> int:
     memory.add_argument("--label", type=str)
     memory.add_argument("--note", type=str, default="")
     memory.add_argument("--session", type=Path)
+    bus_cmd = commands.add_parser("bus-audit", help="Audit timestamped multimodal bus envelopes")
+    bus_cmd.add_argument("path", type=Path)
     bench = commands.add_parser("benchmark", help="Measure offline streaming throughput")
     bench.add_argument("--count", type=int, default=100000)
     bench.add_argument("--iterations", type=int, default=5)
     args = parser.parse_args(argv)
     try:
-        if args.command == "benchmark":
+        if args.command == "bus-audit":
+            bus_audit = BusAudit()
+            for envelope in read_bus_envelopes(args.path):
+                bus_audit.inspect(envelope)
+            result, status = bus_audit.report(), 0
+        elif args.command == "benchmark":
             result, status = benchmark_stream(args.count, args.iterations), 0
         elif args.command == "memory":
             with SpatialMemory(args.db) as store:
@@ -117,7 +126,7 @@ def main(argv: list[str] | None = None) -> int:
             validation = validate(args.path)
             result = {"integrity": validation.as_dict(), "metrics": analyze(args.path).as_dict()}
             status = 1 if validation.issue_count else 0
-    except (OSError, ValueError, InvalidSession) as exc:
+    except (OSError, ValueError, InvalidSession, InvalidBusEvent) as exc:
         print(json.dumps({"error": str(exc)}, indent=2))
         return 2
     print(json.dumps(result, indent=2, sort_keys=True))

@@ -1,0 +1,5 @@
+{"stream":1,"timestampNs":1000000000,"sequence":1,"clockDomain":1,"kind":0,"traceId":1,"quality":3,"missed":0,"payloadBytes":0}
+{"stream":2,"timestampNs":1010000000,"sequence":1,"clockDomain":1,"kind":0,"traceId":1,"quality":3,"missed":0,"payloadBytes":0}
+{"stream":3,"timestampNs":1005000000,"sequence":1,"clockDomain":2,"kind":7,"traceId":1,"quality":1,"missed":0,"payloadBytes":8192}
+{"stream":4,"timestampNs":1020000000,"sequence":1,"clockDomain":1,"kind":4,"traceId":1,"quality":9,"missed":0,"payloadBytes":48}
+{"stream":1,"timestampNs":1050000000,"sequence":3,"clockDomain":1,"kind":0,"traceId":2,"quality":33,"missed":1,"payloadBytes":0}

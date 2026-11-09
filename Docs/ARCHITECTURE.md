@@ -64,3 +64,10 @@ Small modules remain discoverable by responsibility: `HeadTracking.swift` owns c
 - Semantic observations should distinguish **aircraft coordinates**, **camera ray**, **estimated target coordinates**, confidence and reference frame. Unknown depth must remain unknown.
 - Spatial audio should receive a validated world/head transform, elevation confidence and audio device output capabilities. The current pan preview is not binaural HRTF rendering.
 - Any future aircraft flight control must be a separate opt-in subsystem with a separate hazard analysis, permissions, watchdogs and field acceptance plan.
+
+## Multimodal data plane
+
+The app receives accepted head and telemetry samples through its established
+validation pathway, then mirrors them onto `SpatialBus`. The native C++ ring
+handles capacity, per-stream fan-out, payload leases and backpressure. Flight
+commands do **not** route through the data bus. See [contract](MULTIMODAL_BUS.md).

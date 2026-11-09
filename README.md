@@ -20,6 +20,19 @@ The foundation combines three languages deliberately:
 
 > **Developer preview / ongoing foundation development.** Core Swift+C++ tests, C++ tests, and Python offline tests have been executed in a Linux environment. The iOS application has been **syntax-parsed only**, not compiled or run with Xcode. No actual AirPods stream, DJI SDK binary, Mavic Air 2 connection, or aircraft command has been validated here. Real gimbal actuation is **disabled in the standard build**. See [hardware acceptance](Docs/HARDWARE_TEST_PLAN.md).
 
+## High-throughput multimodal bus
+
+The foundation now ships an in-process **C++17 bounded pub/sub data plane** for
+headphone motion, aircraft telemetry, encoded video, perception observations,
+and diagnostics. Independent readers observe per-stream monotonic sequence IDs,
+source timestamps and clock domains, quality flags, precise missed-event counts,
+and explicit overload behavior. C++ subscribers can lease the same native-owned
+payload without per-subscriber copies. Swift owns lifecycle/typed app ingress;
+Python can audit portable metadata envelopes without loading video payloads.
+
+This is a **tested transport foundation**, not a live DJI video decoder or
+flight control mechanism. See [bus engineering contract](Docs/MULTIMODAL_BUS.md).
+
 ## Architecture
 
 ```mermaid
@@ -41,7 +54,8 @@ flowchart TD
     Sync --> Tracking[Bounded pitch controller]
     Tracking --> Gate[Command ticket / callback timeout / fail closed]
     Gate -.->|Simulator or opted-in bench only| DJI
-    Sync --> Recording[(Versioned JSONL sessions)]
+    Sync --> Bus[C++ bounded multimodal bus]
+    Bus --> Recording[(Versioned JSONL sessions)]
     Graph --> Awareness[Orientation and awareness]
     Awareness --> UI[SwiftUI / speech alerts]
     Recording --> QA[Python integrity / semantic audit / quality gates]
