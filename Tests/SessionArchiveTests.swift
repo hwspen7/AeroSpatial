@@ -61,6 +61,23 @@ final class SessionArchiveTests: XCTestCase {
         XCTAssertEqual((try FileManager.default.attributesOfItem(atPath: first.path)[.size]) as? Int, 407)
     }
 
+    func testRestartRecoveryExportsOnlyCompleteRecords() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let journal = try SessionArchive(directory: root, segmentBytes: 1024)
+        try await journal.append(SessionRecord(uptime: 1, kind: "head", source: "simulator"))
+        try await journal.append(SessionRecord(uptime: 2, kind: "head", source: "simulator"))
+        let tail = root.appendingPathComponent("segment-00000000.bin")
+        let file = try FileHandle(forWritingTo: tail)
+        try file.seekToEnd()
+        try file.write(contentsOf: Data([0x30, 0x01, 0x00]))
+        try file.close()
+        let exported = root.appendingPathComponent("recovered.jsonl")
+        _ = try SessionArchive.recover(directory: root, to: exported, segmentBytes: 1024)
+        XCTAssertEqual(try String(contentsOf: exported, encoding: .utf8)
+            .split(separator: "\n").count, 2)
+    }
+
     func testChecksumCorruptionRejectedRatherThanRepaired() async throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: root) }

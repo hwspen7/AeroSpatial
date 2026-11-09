@@ -28,17 +28,29 @@ final class SessionRecorder {
         let stream = AsyncStream<SessionRecord>(bufferingPolicy: .unbounded) { owner = $0 }
         guard let owner else { throw Failure.inactiveSession }
         let capacity = admission
+        let reportFailure: @Sendable (Error) -> Void = { [weak self] error in
+            Task { @MainActor [weak self] in
+                guard let self, self.activeURL == exported, !self.closing else { return }
+                self.onWriteFailure?(error)
+            }
+        }
         worker = Task.detached(priority: .utility) {
             var firstError: Error?
             for await record in stream {
                 defer { capacity.signal() }
                 guard firstError == nil else { continue }
                 do { try await archive.append(record) }
-                catch { firstError = error }
+                catch {
+                    firstError = error
+                    reportFailure(error)
+                }
             }
             if let firstError { return .failure(firstError) }
             do { return .success(try await archive.exportJSONL(to: exported)) }
-            catch { return .failure(error) }
+            catch {
+                reportFailure(error)
+                return .failure(error)
+            }
         }
         continuation = owner
         activeURL = exported
@@ -78,7 +90,6 @@ final class SessionRecorder {
             self.activeURL = nil
             self.lastAdmittedUptime = nil
             if case .success(let path) = result { self.lastSavedURL = path }
-            if case .failure(let error) = result { self.onWriteFailure?(error) }
             completion(result)
         }
     }
