@@ -22,6 +22,8 @@ AeroSpatial's optional-algorithm foundation is deliberately separate from aircra
 
 `Core/PipelineSpan.swift` and `Toolkit/aerospatial_tools/tracing.py` share explicit trace IDs, parent span IDs, monotonic start/end times, clock-domain labels and outcomes. They validate causal ancestry and report per-stage latency/error counts. `Fixtures/traces.jsonl` is a synthetic cross-language example. Spans from different clock domains are **never** merged implicitly. Observed timing is not physical motion completion.
 
+`Toolkit/aerospatial_tools/trace_gate.py` evaluates stage-level minimum sample counts, latency percentiles and error thresholds; missing stages fail closed. This is an experiment quality gate, not an aircraft safety guarantee.
+
 `Core/FrameBundle.swift` forms a video/head/telemetry metadata snapshot only when the existing `MultimodalTimeline` has explicitly normalized timestamps. It rejects stale and uncertainty-exceeding joins and does not retain video bytes or infer target geolocation.
 
 ## Calibration and privacy
