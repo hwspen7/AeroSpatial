@@ -8,9 +8,16 @@ protocol DroneAdapter: AnyObject {
     var onSnapshot: ((AircraftSnapshot) -> Void)? { get set }
     var onStatus: ((String) -> Void)? { get set }
 
+    func attachVideoPublisher(_ publisher: VideoPacketPublisher?)
+    func observeCapabilities(_ observer: @escaping (DeviceEvidence?) -> Void)
     func connect()
     func disconnect()
     func setGimbalPitch(_ pitch: Double, completion: @escaping (Result<Void, Error>) -> Void)
+}
+
+extension DroneAdapter {
+    func attachVideoPublisher(_ publisher: VideoPacketPublisher?) {}
+    func observeCapabilities(_ observer: @escaping (DeviceEvidence?) -> Void) {}
 }
 
 enum DroneMode: String, CaseIterable, Identifiable {

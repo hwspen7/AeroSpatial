@@ -50,6 +50,7 @@ final class AppModel: ObservableObject {
     let recorder = SessionRecorder()
     let spatialBus = try? SpatialBus()
     lazy var ingressPublisher = spatialBus.map { SpatialIngressPublisher(bus: $0) }
+    var videoPacketPublisher: VideoPacketPublisher?
     var tracking = HeadTrackingController()
     let runtimeSupervisor = SafetySupervisor()
     let controlLatency = NativeRuntimeMetrics(deadlineNanoseconds: 5_000_000)
@@ -154,7 +155,15 @@ final class AppModel: ObservableObject {
     }
 
     func configureAdapter() {
+        videoPacketPublisher?.close()
+        videoPacketPublisher = mode == .dji ? spatialBus.map { VideoPacketPublisher(bus: $0) } : nil
         adapter = DroneAdapterFactory.make(mode)
+        adapter.attachVideoPublisher(videoPacketPublisher)
+        adapter.observeCapabilities { [weak self] evidence in
+            guard let self else { return }
+            // Raw SDK component presence never grants pitch control authorization.
+            self.capabilities = evidence?.capabilities(source: .dji) ?? .unverifiedDJI
+        }
         capabilities = mode == .simulation ? .simulator : .unverifiedDJI
         aircraft = adapter.snapshot
         adapter.onSnapshot = { [weak self] snapshot in

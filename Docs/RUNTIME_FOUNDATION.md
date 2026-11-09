@@ -56,3 +56,18 @@ corruption fails closed to avoid silently erasing previously accepted evidence.
 Not complete: real AirPods/DJI hardware timestamps, genuine Mavic Air 2 video
 callback and decoder integration, signed iPhone build, live firmware capability
 probing, and a 24-hour device soak. These cannot be passed through simulation.
+
+## Video-source integration update
+
+`DJIEncodedVideoReceiver` registers a serial `DJIVideoFeedListener` callback
+only when the exact Mavic Air 2 model is observed by MSDK V4. The callback
+passes bounded encoded fragments to `VideoPacketPublisher` without updating
+SwiftUI. `Kernel/h264.cpp` reassembles fragmented Annex-B start codes into NAL
+units. All timestamps are SDK callback receipt-time estimates and carry
+`clockEstimated`/`lowConfidence` quality flags. Disconnection unregisters the
+listener and marks stream discontinuity. See `Docs/P0_ACCEPTANCE.md` for the
+remaining decoder, SDK, and physical acceptance gates.
+
+`SpatialIngressPublisher` now exposes accepted, rejected, published and native
+rejected counters. These describe transport outcomes, not real-world delivery
+or complete aircraft command acknowledgements.

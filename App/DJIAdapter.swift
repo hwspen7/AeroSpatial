@@ -14,6 +14,33 @@ final class DJIAdapter: NSObject, DroneAdapter {
     var onStatus: ((String) -> Void)?
     private var pendingPitchCommand = false
     private var pollTimer: Timer?
+    private var videoPublisher: VideoPacketPublisher?
+    private let videoCallbackQueue = DispatchQueue(label: "AeroSpatial.DJI.EncodedVideo", qos: .userInitiated)
+    private var videoReceiver: DJIEncodedVideoReceiver?
+    private var onDeviceEvidence: ((DeviceEvidence?) -> Void)?
+
+    func observeCapabilities(_ observer: @escaping (DeviceEvidence?) -> Void) {
+        onDeviceEvidence = observer
+    }
+
+    func attachVideoPublisher(_ publisher: VideoPacketPublisher?) {
+        videoPublisher = publisher
+    }
+
+    private func startVideoFeed() {
+        guard let publisher = videoPublisher, videoReceiver == nil else { return }
+        publisher.markDiscontinuity()
+        let receiver = DJIEncodedVideoReceiver(publisher: publisher)
+        videoReceiver = receiver
+        DJISDKManager.videoFeeder().primaryVideoFeed.add(receiver, with: videoCallbackQueue)
+    }
+
+    private func stopVideoFeed() {
+        guard let receiver = videoReceiver else { return }
+        receiver.deactivate()
+        DJISDKManager.videoFeeder().primaryVideoFeed.removeListener(receiver)
+        videoReceiver = nil
+    }
 
     func connect() {
         guard let key = Bundle.main.object(forInfoDictionaryKey: "DJISDKAppKey") as? String,
@@ -26,6 +53,8 @@ final class DJIAdapter: NSObject, DroneAdapter {
     }
 
     func disconnect() {
+        stopVideoFeed()
+        onDeviceEvidence?(nil)
         pollTimer?.invalidate()
         pollTimer = nil
         snapshot.connected = false
@@ -95,19 +124,34 @@ extension DJIAdapter: DJISDKManagerDelegate {
                 self.onStatus?("Connected device is not a DJI aircraft.")
                 return
             }
+            self.stopVideoFeed()
             let model = aircraft.model
             guard AircraftProfile.identify(model).isInitialBenchTarget else {
                 self.snapshot.connected = false
+                self.onDeviceEvidence?(nil)
                 self.onSnapshot?(self.snapshot)
                 self.onStatus?("Aircraft model is not the validated Mavic Air 2 adapter target. Telemetry and commands disabled until an explicit driver is added.")
                 return
             }
             self.snapshot.connected = true
+            // Component presence is observable from the SDK but not a verified
+            // hardware capability. Deliberately keep the verified bit false.
+            let axes: Set<GimbalAxis> = aircraft.gimbal == nil ? [] : [.pitch]
+            if let evidence = DeviceEvidence(identifier: model ?? "Mavic Air 2",
+                                             firmware: "unverified",
+                                             observedAt: ProcessInfo.processInfo.systemUptime,
+                                             axes: axes,
+                                             telemetry: aircraft.flightController != nil,
+                                             video: aircraft.camera != nil,
+                                             verified: false) {
+                self.onDeviceEvidence?(evidence)
+            }
             self.onSnapshot?(self.snapshot)
             self.onStatus?("Mavic Air 2 detected. SDK, firmware and gimbal remain unverified until physical bench acceptance.")
             aircraft.flightController?.delegate = self
             aircraft.gimbal?.delegate = self
             aircraft.battery?.delegate = self
+            self.startVideoFeed()
             self.pollTimer?.invalidate()
             self.pollTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
                 MainActor.assumeIsolated { self?.refreshTelemetry() }

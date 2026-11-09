@@ -75,6 +75,10 @@ extension AppModel {
             show("Connect, provide fresh head motion, and calibrate first.")
             return
         }
+        guard mode != .dji || capabilities.gimbalAxes.contains(.pitch) else {
+            show("Live pitch unavailable: verified hardware capability evidence is required.")
+            return
+        }
         guard mode != .dji || (BenchSafety.allowsExperimentalGimbal && !aircraft.flying) else {
             show("Live control is disabled outside the propeller-off developer bench build.")
             return

@@ -1,0 +1,32 @@
+name: DJI SDK iOS integration compilation (manual)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  dji-sdk-ios:
+    runs-on: macos-15
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install project and dependency tooling
+        run: brew install xcodegen cocoapods
+      - name: Generate iOS app and resolve DJI SDK V4 dependency
+        run: |
+          xcodegen generate
+          pod install --repo-update
+      - name: Compile the DJI-linked application without signing
+        run: |
+          xcodebuild -workspace AeroSpatial.xcworkspace \
+            -scheme AeroSpatial \
+            -configuration Debug \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            CODE_SIGNING_ALLOWED=NO build
+      - name: Note hardware boundary
+        run: |
+          echo 'The SDK-link compile does not demonstrate real Mavic Air 2 hardware compatibility.'
+          echo 'Physical device, firmware, data stream, stop/disconnect and timing tests remain required.'

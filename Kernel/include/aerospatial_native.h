@@ -5,6 +5,7 @@
 #include "aerospatial_wire.h"
 #include "aerospatial_qos.h"
 #include "aerospatial_runtime.h"
+#include "aerospatial_h264.h"
 
 #ifdef __cplusplus
 extern "C" {

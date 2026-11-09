@@ -46,6 +46,18 @@ PYTHONPATH=Toolkit python3 -m aerospatial_tools trace-audit Fixtures/traces.json
 PYTHONPATH=Toolkit python3 -m aerospatial_tools workload --samples 3000 --seed 42
 ```
 
+
+## P0 runtime and DJI encoded video
+
+The current developer foundation keeps the C++/Swift/Python core aircraft-agnostic.
+DJI **Mavic Air 2** is the initial experimental MSDK V4 adapter; Air 2S and
+other products require their own verified adapters. The source now contains an
+SDK-conditional encoded H.264 callback receiver, fixed-capacity off-main
+transport, and a bounded native Annex-B NAL parser. **NAL units are not decoded
+frames**, and capture timestamps, SDK linking and hardware remain unverified.
+For portable tests and separate physical acceptance gates, see
+[P0 acceptance](Docs/P0_ACCEPTANCE.md).
+
 ## Architecture
 
 ```mermaid
