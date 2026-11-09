@@ -313,3 +313,7 @@ PYTHONPATH=Toolkit python -m aerospatial_tools vision-match reference.jpg revisi
 
 See [Mathematical foundation](Docs/MATHEMATICAL_FOUNDATION.md) and
 [acceptance review](Docs/ACCEPTANCE_REVIEW.md).
+
+## Portable runtime hardening
+
+The observation-only P0 building blocks add a bounded real-time mailbox, native atomic latency histogram, uncertainty-aware clock registry, device-evidence expiration, fail-closed safety assessment, encoded-frame routing, and asynchronous CRC-framed journal writes. See [runtime acceptance and remaining hardware gates](Docs/RUNTIME_FOUNDATION.md). These are portable components, **not** a claim of completed DJI/iPhone hardware integration.
