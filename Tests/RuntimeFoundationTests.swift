@@ -163,3 +163,22 @@ extension RuntimeFoundationTests {
         XCTAssertGreaterThanOrEqual(result.p99_upper_ns, 200)
     }
 }
+
+extension RuntimeFoundationTests {
+    func testOffMainIngressPublisher() async throws {
+        let bus = try SpatialBus()
+        let subscriber = try XCTUnwrap(bus.subscribe(.head, latest: false))
+        let publisher = SpatialIngressPublisher(bus: bus, capacity: 16)
+        XCTAssertTrue(publisher.send(head: HeadSample(uptime: 5,
+                          pose: HeadPose(yaw: 1, pitch: 2, roll: 3))))
+        var received: SpatialEvent?
+        for _ in 0..<100 {
+            received = try subscriber.next()
+            if received != nil { break }
+            try await Task.sleep(nanoseconds: 2_000_000)
+        }
+        XCTAssertEqual(received?.stream, .head)
+        let pose = try JSONDecoder().decode(HeadSample.self, from: XCTUnwrap(received?.payload))
+        XCTAssertEqual(pose.pose.yaw, 1)
+    }
+}

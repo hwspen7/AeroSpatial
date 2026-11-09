@@ -317,3 +317,5 @@ See [Mathematical foundation](Docs/MATHEMATICAL_FOUNDATION.md) and
 ## Portable runtime hardening
 
 The observation-only P0 building blocks add a bounded real-time mailbox, native atomic latency histogram, uncertainty-aware clock registry, device-evidence expiration, fail-closed safety assessment, encoded-frame routing, and asynchronous CRC-framed journal writes. See [runtime acceptance and remaining hardware gates](Docs/RUNTIME_FOUNDATION.md). These are portable components, **not** a claim of completed DJI/iPhone hardware integration.
+
+The application now forwards head and telemetry publications through `SpatialIngressPublisher` on a utility worker and writes its legacy JSONL sessions through a bounded asynchronous writer. This does not constitute a complete VideoToolbox/DJI hardware integration or a finished segment-journal UI migration.

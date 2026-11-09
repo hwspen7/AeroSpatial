@@ -44,7 +44,7 @@ extension AppModel {
         let sample = HeadSample(uptime: ProcessInfo.processInfo.systemUptime,
                                 pose: HeadPose(yaw: demoHeadYaw, pitch: demoHeadPitch, roll: 0))
         head = sample
-        _ = spatialBus?.publish(head: sample, simulated: true)
+        _ = ingressPublisher?.send(head: sample, simulated: true)
         _ = synchronizer.append(sample)
         log("head", source: "simulator", fields: [
             "yaw": sample.pose.yaw, "pitch": sample.pose.pitch,

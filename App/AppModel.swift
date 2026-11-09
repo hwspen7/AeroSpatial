@@ -49,6 +49,7 @@ final class AppModel: ObservableObject {
     let audio = AudioCueService()
     let recorder = SessionRecorder()
     let spatialBus = try? SpatialBus()
+    lazy var ingressPublisher = spatialBus.map { SpatialIngressPublisher(bus: $0) }
     var tracking = HeadTrackingController()
     var commandGate = GimbalCommandGate()
     var sensorHealth = SensorHealthMonitor()
@@ -67,7 +68,7 @@ final class AppModel: ObservableObject {
             guard self.sensorHealth.observeHead(sample, receivedAt: ProcessInfo.processInfo.systemUptime) == .accepted,
                   self.synchronizer.append(sample) else { return }
             self.head = sample
-            _ = self.spatialBus?.publish(head: sample)
+            _ = self.ingressPublisher?.send(head: sample)
             self.headSource = "AirPods motion"
             self.log("head", source: "airpods",
                      fields: ["yaw": sample.pose.yaw, "pitch": sample.pose.pitch, "roll": sample.pose.roll,
@@ -87,6 +88,11 @@ final class AppModel: ObservableObject {
             self.calculateHeadRelativeCue()
         }
         pilot.onStatus = { [weak self] status in self?.show(status) }
+        recorder.onWriteFailure = { [weak self] error in
+            guard let self, self.recording else { return }
+            self.stopRecording()
+            self.show("Recording interrupted: \(error.localizedDescription)")
+        }
         configureAdapter()
     }
 
@@ -165,7 +171,7 @@ final class AppModel: ObservableObject {
             guard self.sensorHealth.observeAircraft(snapshot, receivedAt: ProcessInfo.processInfo.systemUptime) == .accepted,
                   self.synchronizer.append(snapshot) else { return }
             self.aircraft = snapshot
-            _ = self.spatialBus?.publish(aircraft: snapshot)
+            _ = self.ingressPublisher?.send(telemetry: snapshot)
             self.calculateRelativePosition()
             self.calculateHeadRelativeCue()
             for alert in self.advisor.observe(snapshot) {
