@@ -71,12 +71,24 @@ def main(argv: list[str] | None = None) -> int:
     workload_cmd = commands.add_parser("workload", help="Reproducible optional-compute overload experiment")
     workload_cmd.add_argument("--samples", type=int, default=3000)
     workload_cmd.add_argument("--seed", type=int, default=7)
+    video_cmd = commands.add_parser("video-probe", help="Decode offline video and inspect frame timing")
+    video_cmd.add_argument("path", type=Path)
+    video_cmd.add_argument("--max-frames", type=int, default=2000)
+    match_cmd = commands.add_parser("vision-match", help="Estimate visual place overlap using ORB and RANSAC")
+    match_cmd.add_argument("reference", type=Path)
+    match_cmd.add_argument("query", type=Path)
     bench = commands.add_parser("benchmark", help="Measure offline streaming throughput")
     bench.add_argument("--count", type=int, default=100000)
     bench.add_argument("--iterations", type=int, default=5)
     args = parser.parse_args(argv)
     try:
-        if args.command == "algorithms":
+        if args.command == "video-probe":
+            from .vision_cli import inspect_video
+            result, status = inspect_video(args.path, maximum_frames=args.max_frames), 0
+        elif args.command == "vision-match":
+            from .vision_cli import match_images
+            result, status = match_images(args.reference, args.query), 0
+        elif args.command == "algorithms":
             result = {"executionOrder": [item.identifier for item in load_manifests(args.manifest).ordered()]}
             status = 0
         elif args.command == "trace-audit":
@@ -143,7 +155,7 @@ def main(argv: list[str] | None = None) -> int:
             validation = validate(args.path)
             result = {"integrity": validation.as_dict(), "metrics": analyze(args.path).as_dict()}
             status = 1 if validation.issue_count else 0
-    except (OSError, ValueError, InvalidSession, InvalidBusEvent) as exc:
+    except (OSError, ValueError, RuntimeError, InvalidSession, InvalidBusEvent) as exc:
         print(json.dumps({"error": str(exc)}, indent=2))
         return 2
     print(json.dumps(result, indent=2, sort_keys=True))

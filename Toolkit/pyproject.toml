@@ -11,6 +11,10 @@ authors = [{name = "AeroSpatial Contributors"}]
 license = {text = "MIT"}
 dependencies = []
 
+[project.optional-dependencies]
+vision = ["opencv-python-headless>=4.6", "numpy>=1.24"]
+privacy = ["cryptography>=41"]
+
 [project.scripts]
 aerospatial = "aerospatial_tools.cli:main"
 

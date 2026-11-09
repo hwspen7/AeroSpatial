@@ -294,3 +294,22 @@ geolocation of visual targets is claimed.
 See [all 20 acceptance items](Docs/INTEGRATION_ACCEPTANCE.md) and
 [wire/storage contracts](Docs/STORAGE_PROTOCOL.md). Physical hardware and full
 Xcode/iOS integration gates remain open and must be verified before any aircraft use.
+
+## Numerical foundation and offline vision
+
+The portable C++ kernel includes Theil–Sen/least-squares clock calibration,
+Brown–Conrady distortion inversion, and a constant-velocity Kalman estimator
+with normalized innovation gating. Swift wraps the same C ABI. Optional offline
+Python tools add OpenCV video decode, ORB + RANSAC image-level place matching,
+trusted subprocess algorithm execution and AES-256-GCM authorized export.
+These algorithms do **not** infer precise GPS positions or control flight.
+
+```bash
+# Optional capabilities (not needed for the portable core)
+python -m pip install -e './Toolkit[vision,privacy]'
+PYTHONPATH=Toolkit python -m aerospatial_tools video-probe path/to/local-video.mp4
+PYTHONPATH=Toolkit python -m aerospatial_tools vision-match reference.jpg revisit.jpg
+```
+
+See [Mathematical foundation](Docs/MATHEMATICAL_FOUNDATION.md) and
+[acceptance review](Docs/ACCEPTANCE_REVIEW.md).

@@ -104,3 +104,21 @@ jobs:
         env:
           ASAN_OPTIONS: detect_leaks=1
         run: ctest --test-dir build-sanitize --output-on-failure
+
+  offline-vision-privacy:
+    name: Offline vision and encrypted export
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install optional vision and privacy libraries
+        run: python -m pip install -e './Toolkit[vision,privacy]'
+      - name: Decode real generated video, RANSAC matching, AES-GCM and worker checks
+        env:
+          PYTHONPATH: Toolkit
+        run: |
+          python -m unittest discover -s ToolkitTests -p 'test_video_vision.py' -v
+          python -m unittest discover -s ToolkitTests -p 'test_vault.py' -v
+          python -m unittest discover -s ToolkitTests -p 'test_worker.py' -v
