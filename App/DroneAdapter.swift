@@ -81,7 +81,8 @@ final class SimulatorDroneAdapter: DroneAdapter {
         timer?.invalidate()
         timer = nil
         snapshot.connected = false
-        onCapabilities?(.unverifiedDJI)
+        onCapabilities?(DeviceCapabilities(deviceIdentifier: "simulator", provenance: .simulator,
+                                           gimbalAxes: [], canReadTelemetry: false))
         onSnapshot?(snapshot)
         onStatus?("Simulation stopped.")
     }
