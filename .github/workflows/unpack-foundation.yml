@@ -1,0 +1,52 @@
+name: Unpack AeroSpatial Foundation
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'bootstrap/**'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  unpack:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - name: Verify parts and expand sources
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import base64, io, lzma, pathlib, tarfile, sys
+          folder = pathlib.Path('bootstrap')
+          parts = sorted(folder.glob('part-*.txt'))
+          if len(parts) != 5:
+              print(f'Waiting for 5 archive parts; found {len(parts)}.')
+              sys.exit(0)
+          payload = ''.join(p.read_text().strip() for p in parts)
+          archive = lzma.decompress(base64.b64decode(payload, validate=True))
+          with tarfile.open(fileobj=io.BytesIO(archive), mode='r:') as tf:
+              for entry in tf.getmembers():
+                  path = pathlib.PurePosixPath(entry.name)
+                  if entry.issym() or entry.islnk() or entry.isdev() or path.is_absolute() or '..' in path.parts:
+                      raise ValueError('Unsafe source archive path')
+              tf.extractall('.', filter='data')
+          for p in parts:
+              p.unlink()
+          folder.rmdir()
+          pathlib.Path('.github/workflows/unpack-foundation.yml').unlink()
+          print('Source tree reconstructed.')
+          PY
+      - name: Commit expanded tree
+        shell: bash
+        run: |
+          if [ -d bootstrap ]; then echo 'Waiting for remaining parts'; exit 0; fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          if ! git diff --cached --quiet; then
+            git commit -m 'feat: publish AeroSpatial v0.4.0 source foundation'
+            git push origin HEAD:main
+          fi
