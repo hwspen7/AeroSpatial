@@ -1,0 +1,76 @@
+name: Foundation CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  swift-core:
+    name: Swift + C++ bridge
+    runs-on: ubuntu-latest
+    container: swift:6.2
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test portable Swift package and native bridge
+        run: swift test
+      - name: Replay legacy fixture
+        run: swift run aerospatial-replay Docs/sample-session.jsonl
+      - name: Replay schema v1 fixture
+        run: swift run aerospatial-replay Fixtures/session.jsonl
+      - name: Swift ring benchmark smoke test
+        run: swift run -c release aerospatial-bench 10000
+      - name: Swift virtual-time control scenario
+        run: swift run aerospatial-scenario /tmp/aerospatial-swift.jsonl 5 42 2
+
+  native-python:
+    name: C++ / Python / parity
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Compile native algorithms
+        run: |
+          cmake -S Kernel -B build-native -DCMAKE_BUILD_TYPE=Release
+          cmake --build build-native --parallel 4
+          ctest --test-dir build-native --output-on-failure
+      - name: Unit and cross-language tests
+        env:
+          PYTHONPATH: Toolkit
+          AEROSPATIAL_NATIVE_PROBE: ${{ github.workspace }}/build-native/aerospatial-native-probe
+        run: python -m unittest discover -s ToolkitTests -v
+      - name: Python stream benchmark smoke test
+        env:
+          PYTHONPATH: Toolkit
+        run: python -m aerospatial_tools benchmark --count 10000 --iterations 2
+      - name: Validate recorded data contracts
+        env:
+          PYTHONPATH: Toolkit
+        run: |
+          python -m aerospatial_tools validate Docs/sample-session.jsonl
+          python -m aerospatial_tools report Fixtures/session.jsonl
+          python -m aerospatial_tools simulate "$RUNNER_TEMP/aerospatial.jsonl" --seconds 5 --seed 42
+          python -m aerospatial_tools validate "$RUNNER_TEMP/aerospatial.jsonl"
+          python -m aerospatial_tools audit "$RUNNER_TEMP/aerospatial.jsonl"
+          python -m aerospatial_tools gate "$RUNNER_TEMP/aerospatial.jsonl" --profile Quality/simulator.json
+          python -m aerospatial_tools sanitize "$RUNNER_TEMP/aerospatial.jsonl" "$RUNNER_TEMP/public.jsonl"
+          python -m aerospatial_tools validate "$RUNNER_TEMP/public.jsonl"
+          python -m aerospatial_tools digest create "$RUNNER_TEMP/public.jsonl" "$RUNNER_TEMP/digest.json"
+          python -m aerospatial_tools digest verify "$RUNNER_TEMP/public.jsonl" "$RUNNER_TEMP/digest.json"
+
+  native-windows:
+    name: Native C++ Windows
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile and test native library
+        run: |
+          cmake -S Kernel -B build-native
+          cmake --build build-native --config Release --parallel
+          ctest --test-dir build-native --config Release --output-on-failure
