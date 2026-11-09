@@ -62,3 +62,17 @@ algorithm-platform tracks have different scopes and are recorded separately.
 **No flight-control command path is included.** Until these gates pass, this
 project is a portable algorithm library and experimental app scaffold, not a
 production-ready drone-control application.
+
+## Realtime platform hardening
+
+The realtime runtime now has a native preallocated SPSC head ingress, bounded
+telemetry mailbox, online per-domain clock coordinator, observed device capability
+report, asynchronous CRC journal sink, separate safety supervisor, and measured
+latency/OS diagnostic surfaces. The macOS simulator compilation workflow now runs
+on pushes and pull requests. See [REALTIME_RUNTIME.md](REALTIME_RUNTIME.md).
+
+These are **portable software gates**, not a blanket P0 physical acceptance.
+The DJI video feed listener and optional DJIWidget preview path require a
+Mac with the DJI SDK and an actual camera feed. No decoded CVPixelBuffer inference
+or camera-capture timestamp source has been validated, and the AirPods/iOS/aircraft
+bench and sustained thermal runs remain open. No flight-control commands are added.

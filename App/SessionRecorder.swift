@@ -1,14 +1,18 @@
 import Foundation
 import AeroSpatialCore
 
+/// Asynchronous, CRC-framed local recording. Filesystem writes and fsync happen
+/// on the utility queue, not in the UI/sensor callback. Backpressure is explicit.
 @MainActor
 final class SessionRecorder {
-    private var handle: FileHandle?
+    private var sink: SegmentJournalSink?
     private var sequence = 0
     private var lastUptime: Double?
     private var sessionId: String?
     private(set) var activeURL: URL?
     private(set) var lastSavedURL: URL?
+    private(set) var lastFailure: String?
+    var queuedBytes: Int? { sink?.queuedBytes }
     private let encoder: JSONEncoder = {
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
@@ -17,27 +21,23 @@ final class SessionRecorder {
     }()
 
     func start() throws -> URL {
-        if handle != nil { stop() }
+        if sink != nil { stop() }
         let folder = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("AeroSpatialSessions", isDirectory: true)
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime]
-        let suffix = formatter.string(from: Date()).replacingOccurrences(of: ":", with: "-")
-        let path = folder.appendingPathComponent("flight-\(suffix)-\(UUID().uuidString.prefix(8)).jsonl")
-        guard FileManager.default.createFile(atPath: path.path, contents: nil) else {
-            throw CocoaError(.fileWriteUnknown)
-        }
-        handle = try FileHandle(forWritingTo: path)
+        let name = "flight-\(UUID().uuidString)"
+        let path = folder.appendingPathComponent(name, isDirectory: true)
+        sink = try SegmentJournalSink(directory: path)
+        sessionId = UUID().uuidString
         sequence = 0
         lastUptime = nil
-        sessionId = UUID().uuidString
+        lastFailure = nil
         activeURL = path
         return path
     }
 
     func write(_ record: SessionRecord) throws {
-        guard let handle = handle, let sessionId = sessionId else { return }
+        guard let sink, let sessionId else { return }
         guard EventContract.accepts(record),
               lastUptime.map({ record.uptime >= $0 }) ?? true else {
             throw CocoaError(.fileWriteInapplicableStringEncoding)
@@ -53,19 +53,24 @@ final class SessionRecorder {
         guard data.count <= EventContract.maximumLineBytes else {
             throw CocoaError(.fileWriteInapplicableStringEncoding)
         }
-        try handle.write(contentsOf: data + Data([0x0A]))
+        try sink.submit(data)
         sequence += 1
         lastUptime = record.uptime
     }
 
     func stop() {
-        try? handle?.synchronize()
-        try? handle?.close()
-        handle = nil
+        guard let sink else { return }
+        do {
+            try sink.close()
+            lastSavedURL = activeURL
+        } catch {
+            lastFailure = String(describing: error)
+            lastSavedURL = nil
+        }
+        self.sink = nil
+        activeURL = nil
         sessionId = nil
         sequence = 0
         lastUptime = nil
-        if let url = activeURL { lastSavedURL = url }
-        activeURL = nil
     }
 }

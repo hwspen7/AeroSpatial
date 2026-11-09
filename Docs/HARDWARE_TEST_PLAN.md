@@ -44,3 +44,14 @@
 ## Evidence to capture
 
 Use JSONL session logs and a separate checklist with test timestamp, software versions, firmware versions, expected/actual behavior, errors and recovery steps. Report exact limitations. Mark each hardware gate pass only after actual measurement.
+
+## Realtime platform supplementary acceptance
+
+- [ ] Verify actual DJI SDK plus DJIWidget CocoaPods compilation and `DJIVideoFeedListener` method dispatch.
+- [ ] Confirm video packets arrive, are bounded, and include **estimated receipt timestamps**, not invented capture times.
+- [ ] Observe DJIWidget decoded preview without freezing the iOS UI.
+- [ ] Collect headset SPSC drop/coalescing counts under prolonged motion.
+- [ ] Compare real head timestamps with host callback receipts; measure clock drift and untrusted alignment rejection.
+- [ ] Trigger disconnect, app backgrounding, active SDK command timeout, and low-storage conditions while recording.
+- [ ] Verify session recovery and JSONL export from the physical iPhone.
+- [ ] Run a controlled extended soak measuring CPU, thermal state, RSS and sensor-to-output p95/p99 delays.
