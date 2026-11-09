@@ -105,6 +105,8 @@ extension AppModel {
     }
 
     func controlTick() {
+        let tickStarted = DispatchTime.now().uptimeNanoseconds
+        defer { _ = controlLatency?.record(DispatchTime.now().uptimeNanoseconds - tickStarted) }
         if demoInputEnabled { updateDemoHead() }
         if mode == .dji && (aircraft.flying || !BenchSafety.allowsExperimentalGimbal) {
             if armed { disarm() }
@@ -131,6 +133,19 @@ extension AppModel {
         }
         synchronized = aligned.head != nil && aligned.aircraft?.connected == true
         let freshAircraft = aligned.aircraft?.connected == true
+        if armed {
+            let verdict = runtimeSupervisor.assess(
+                now: now, authorized: armed, connected: freshAircraft,
+                flying: aircraft.flying, lastHead: head?.uptime,
+                lastTelemetry: aligned.aircraft?.uptime,
+                pitchCapabilityVerified: mode == .simulation || capabilities.gimbalAxes.contains(.pitch))
+            if !verdict.permitted {
+                log("safety_blocked", source: "supervisor", note: String(describing: verdict.reason))
+                disarm()
+                show("Independent safety supervisor blocked control.")
+                return
+            }
+        }
         if armed && commandGate.pending != nil {
             if streams.head.freshness != .fresh || streams.aircraft.freshness != .fresh {
                 disarm()

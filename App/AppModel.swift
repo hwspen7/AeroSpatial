@@ -51,6 +51,8 @@ final class AppModel: ObservableObject {
     let spatialBus = try? SpatialBus()
     lazy var ingressPublisher = spatialBus.map { SpatialIngressPublisher(bus: $0) }
     var tracking = HeadTrackingController()
+    let runtimeSupervisor = SafetySupervisor()
+    let controlLatency = NativeRuntimeMetrics(deadlineNanoseconds: 5_000_000)
     var commandGate = GimbalCommandGate()
     var sensorHealth = SensorHealthMonitor()
     var synchronizer = SensorSynchronizer()

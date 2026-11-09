@@ -81,6 +81,10 @@ extension DashboardView {
                      "Aircraft: \(aircraft.accepted) accepted, \(aircraft.rejected) rejected, \(aircraft.observedGaps) gaps.")
                     .font(.caption).foregroundStyle(.secondary)
             }
+            if let latency = model.controlLatency?.report(), latency.samples > 0 {
+                Text("Control-loop p95 (bucket bound): \(Double(latency.p95_upper_ns) / 1_000_000, specifier: "%.2f") ms, \(latency.breaches) over budget")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
             Label(model.commandGate.pending == nil ? "No command in flight" : "Awaiting gimbal callback",
                   systemImage: model.commandGate.pending == nil ? "checkmark.shield" : "clock.arrow.circlepath")
                 .font(.caption).foregroundStyle(.secondary)
