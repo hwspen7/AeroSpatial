@@ -15,6 +15,9 @@ class TopicAudit:
     stale: int = 0
     simulated: int = 0
     upstream_gap: int = 0
+    upstream_missing: int = 0
+    sampled: int = 0
+    rejected_at_source: int = 0
     gaps_detected: int = 0
     initial_gap_observed: int = 0
     previous_sequence: int = 0
@@ -51,6 +54,9 @@ class TopicAudit:
         self.stale += bool(event.quality & (1 << 4))
         self.simulated += bool(event.quality & (1 << 1))
         self.upstream_gap += bool(event.quality & (1 << 5))
+        self.upstream_missing += event.upstream_missing
+        self.sampled += event.sampled
+        self.rejected_at_source += event.rejected
 
 
 @dataclass
@@ -71,6 +77,9 @@ class BusAudit:
                 "stale": value.stale,
                 "simulated": value.simulated,
                 "upstreamGap": value.upstream_gap,
+                "upstreamMissing": value.upstream_missing,
+                "deliberatelySampled": value.sampled,
+                "rejectedAtSource": value.rejected_at_source,
                 "gapsDetected": value.gaps_detected,
                 "initialGapObserved": value.initial_gap_observed,
             }

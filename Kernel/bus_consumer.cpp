@@ -1,7 +1,19 @@
 #include "bus_internal.hpp"
 #include <cstring>
+#include <algorithm>
 #include <memory>
 #include <new>
+#ifdef AEROSPATIAL_TEST_HOOKS
+#include <atomic>
+namespace { std::atomic<int> subscribe_fault{0}; }
+extern "C" void as_bus_test_fail_subscribe_at(int point) { subscribe_fault.store(point); }
+static void subscription_checkpoint(int point) {
+    int expected = point;
+    if (subscribe_fault.compare_exchange_strong(expected, 0)) throw std::bad_alloc();
+}
+#else
+static void subscription_checkpoint(int) {}
+#endif
 
 void bus_trim_consumed(BusTopic &topic) {
     uint64_t minimum = topic.next;
@@ -55,9 +67,12 @@ extern "C" ASBusSubscription *as_bus_subscribe(ASBus *bus, uint32_t stream_id,
     topic->cursors.erase(out, topic->cursors.end());
     if (topic->cursors.size() >= topic->limit) return nullptr;
     try {
+        subscription_checkpoint(1);
         auto cursor = std::make_shared<BusCursor>();
         cursor->next = start_latest ? topic->next : topic->oldest;
+        subscription_checkpoint(2);
         auto subscription = std::unique_ptr<ASBusSubscription>(new ASBusSubscription{topic, cursor});
+        subscription_checkpoint(3);
         topic->cursors.push_back(cursor);
         topic->stats.active_subscribers = static_cast<uint32_t>(topic->cursors.size());
         return subscription.release();
@@ -72,6 +87,11 @@ extern "C" void as_bus_unsubscribe(ASBusSubscription *subscription) {
         // Leases keep cursor alive; closed subscription should not stall trim.
         auto cursor = subscription->cursor;
         cursor->next = topic->next;
+        topic->cursors.erase(std::remove_if(topic->cursors.begin(), topic->cursors.end(),
+            [&cursor](const std::weak_ptr<BusCursor> &weak) {
+                auto entry = weak.lock();
+                return !entry || entry == cursor;
+            }), topic->cursors.end());
         bus_trim_consumed(*topic);
     }
     delete subscription;

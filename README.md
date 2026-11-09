@@ -264,3 +264,20 @@ UI source files live directly under `App/`. Native public headers remain under
 `Kernel/include/` because Swift Package Manager requires that public header path.
 The Python package remains under `Toolkit/aerospatial_tools/` for importability.
 Neither the bus nor the timeline issues flight commands. Hardware validation is pending.
+
+## Durable streams and cross-language diagnostics
+
+The C++ kernel provides an in-process, bounded event bus with leased fan-out, memory quotas,
+backpressure, strict stream sequencing and fast cached publisher handles. New optional
+transport utilities add a 44-byte CRC-checked head-motion record and a bounded
+segmented append-only journal, both accessible from Swift and Python tooling.
+
+`Core/VideoIngress.swift` validates a caller-provided **encoded** video frame's size,
+codec, clock domain and capture timestamp before publishing. It does **not** decode
+DJI video or establish a live video source. Frame observations can be associated
+with trusted video evidence within explicit time uncertainty, but no automatic
+geolocation of visual targets is claimed.
+
+See [all 20 acceptance items](Docs/INTEGRATION_ACCEPTANCE.md) and
+[wire/storage contracts](Docs/STORAGE_PROTOCOL.md). Physical hardware and full
+Xcode/iOS integration gates remain open and must be verified before any aircraft use.

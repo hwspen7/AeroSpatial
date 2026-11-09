@@ -2,6 +2,7 @@
 #define AEROSPATIAL_NATIVE_H
 
 #include <stddef.h>
+#include "aerospatial_wire.h"
 
 #ifdef __cplusplus
 extern "C" {

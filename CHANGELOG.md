@@ -61,3 +61,12 @@
 ## 0.1.0 — Initial foundation
 
 - Portable Swift geometry, time synchronization, pitch mapping, JSONL replay, SwiftUI simulator and experimental DJI adapter source.
+
+## Reliability, transport and storage hardening
+
+- Add fault-injected subscriber lifecycle tests and fix stale active-subscription bookkeeping.
+- Introduce native portable motion records with CRC and version checks across C++, Swift and Python.
+- Add bounded segmented journals with rotation, crash-tail repair and retention refusal.
+- Add strict bus diagnostic format migration and explicit loss provenance counters.
+- Add clock uncertainty envelopes, validated encoded-video ingress and evidence-only frame association.
+- Add multi-producer soak, latency histogram, performance gate and extended CI verification.

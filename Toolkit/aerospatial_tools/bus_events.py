@@ -10,6 +10,7 @@ from pathlib import Path
 import base64
 import json
 from typing import Iterator
+from .protocol import TransportPacket, ProtocolError
 
 STREAM_NAMES = {1: "head", 2: "telemetry", 3: "video", 4: "perception", 5: "diagnostic"}
 MAX_LINE = 32_768
@@ -39,11 +40,26 @@ class BusEnvelope:
     quality: int
     missed: int
     payload_bytes: int
+    upstream_missing: int = 0
+    sampled: int = 0
+    rejected: int = 0
+    aligned_ns: int | None = None
+    uncertainty_ns: int | None = None
 
     @classmethod
     def parse(cls, raw: dict) -> "BusEnvelope":
         if not isinstance(raw, dict):
             raise InvalidBusEvent("event must be an object")
+        if "version" in raw:
+            try:
+                packet = TransportPacket.from_dict({key: value for key, value in raw.items()
+                                                    if key != "payloadBase64"})
+            except ProtocolError as exc:
+                raise InvalidBusEvent(str(exc)) from exc
+            packet_fields = (packet.upstream_missing, packet.sampled, packet.rejected,
+                             packet.aligned_ns, packet.uncertainty_ns)
+        else:
+            packet_fields = (0, 0, 0, None, None)
         stream = unsigned(raw.get("stream"), 32, "stream", positive=True)
         if stream not in STREAM_NAMES:
             raise InvalidBusEvent("unknown stream")
@@ -73,6 +89,9 @@ class BusEnvelope:
             quality=flags,
             missed=unsigned(raw.get("missed"), 64, "missed"),
             payload_bytes=size,
+            upstream_missing=packet_fields[0], sampled=packet_fields[1],
+            rejected=packet_fields[2], aligned_ns=packet_fields[3],
+            uncertainty_ns=packet_fields[4],
         )
 
 

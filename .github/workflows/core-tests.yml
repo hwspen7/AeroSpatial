@@ -47,10 +47,12 @@ jobs:
           ./build-bus/aerospatial-bus-bench 100000 8 0 fast
           ./build-bus/aerospatial-bus-bench 100000 8 0 indexed
           ./build-bus/aerospatial-bus-bench 20000 1024 4 fast
+          PYTHONPATH=Toolkit python -m aerospatial_tools.soak ./build-bus/aerospatial-bus-bench --count 20000 --payload 1024 --readers 4 --repeats 3
       - name: Unit and cross-language tests
         env:
           PYTHONPATH: Toolkit
           AEROSPATIAL_NATIVE_PROBE: ${{ github.workspace }}/build-native/aerospatial-native-probe
+          AEROSPATIAL_WIRE_PROBE: ${{ github.workspace }}/build-native/aerospatial-wire-probe
         run: python -m unittest discover -s ToolkitTests -v
       - name: Python stream benchmark smoke test
         env:
