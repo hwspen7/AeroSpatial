@@ -1,25 +1,39 @@
-name: iOS simulator compile (manual)
+name: iOS simulator compilation
 
 on:
+  push:
+    branches: [main]
+  pull_request:
   workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
-  build-simulation:
+  simulator-build:
     runs-on: macos-15
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4
       - name: Install XcodeGen
         run: brew install xcodegen
-      - name: Generate project
+      - name: Generate reproducible project
         run: xcodegen generate
-      - name: Build iOS simulator, without DJI SDK
+      - name: Verify simulation-only iOS target compiles
         run: |
           xcodebuild -project AeroSpatial.xcodeproj \
             -scheme AeroSpatial \
             -configuration Debug \
             -sdk iphonesimulator \
             -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath "$RUNNER_TEMP/AeroSpatialDerived" \
             CODE_SIGNING_ALLOWED=NO build
+      - name: Upload build evidence on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-build-configuration
+          path: |
+            project.yml
+            Package.swift
+            App/Info.plist

@@ -46,6 +46,18 @@ PYTHONPATH=Toolkit python3 -m aerospatial_tools trace-audit Fixtures/traces.json
 PYTHONPATH=Toolkit python3 -m aerospatial_tools workload --samples 3000 --seed 42
 ```
 
+## Realtime foundation and device integration
+
+The current foundation includes a preallocated C++ SPSC head-motion queue,
+Swift last-value telemetry mailbox, online clock models, observed capability
+reports, an additional fail-closed safety supervisor, a bounded background
+CRC journal, and in-app latency/memory diagnostics. A `journal-export` offline
+command recovers JSONL records from a session directory. The optional MSDK V4
+adapter registers a DJI H.264 transport-packet callback and DJIWidget preview
+when those proprietary dependencies are installed. These are not independently
+verified on a real iPhone or aircraft. [Implementation and outstanding hardware
+checks](Docs/REALTIME_RUNTIME.md).
+
 ## Architecture
 
 ```mermaid

@@ -7,6 +7,7 @@ protocol DroneAdapter: AnyObject {
     var snapshot: AircraftSnapshot { get }
     var onSnapshot: ((AircraftSnapshot) -> Void)? { get set }
     var onStatus: ((String) -> Void)? { get set }
+    var onCapabilities: ((DeviceCapabilities) -> Void)? { get set }
 
     func connect()
     func disconnect()
@@ -39,6 +40,7 @@ final class SimulatorDroneAdapter: DroneAdapter {
     var snapshot: AircraftSnapshot
     var onSnapshot: ((AircraftSnapshot) -> Void)?
     var onStatus: ((String) -> Void)?
+    var onCapabilities: ((DeviceCapabilities) -> Void)?
     private var timer: Timer?
     private var pilotPosition: GeoPoint?
 
@@ -56,6 +58,7 @@ final class SimulatorDroneAdapter: DroneAdapter {
     func connect() {
         timer?.invalidate()
         snapshot.connected = true
+        onCapabilities?(.simulator)
         onStatus?("Simulation connected. No aircraft commands are transmitted.")
         timer = Timer.scheduledTimer(withTimeInterval: 0.2, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated { self?.tick() }
@@ -78,6 +81,8 @@ final class SimulatorDroneAdapter: DroneAdapter {
         timer?.invalidate()
         timer = nil
         snapshot.connected = false
+        onCapabilities?(DeviceCapabilities(deviceIdentifier: "simulator", provenance: .simulator,
+                                           gimbalAxes: [], canReadTelemetry: false))
         onSnapshot?(snapshot)
         onStatus?("Simulation stopped.")
     }
@@ -97,10 +102,15 @@ final class UnavailableDJIAdapter: DroneAdapter {
     var snapshot = AircraftSnapshot(uptime: 0, source: .dji, connected: false, flying: false)
     var onSnapshot: ((AircraftSnapshot) -> Void)?
     var onStatus: ((String) -> Void)?
+    var onCapabilities: ((DeviceCapabilities) -> Void)?
     func connect() {
         onStatus?("DJI SDK is not linked. Build the CocoaPods workspace on a Mac with a registered DJI App Key.")
     }
-    func disconnect() { snapshot.connected = false; onSnapshot?(snapshot) }
+    func disconnect() {
+        snapshot.connected = false
+        onCapabilities?(.unverifiedDJI)
+        onSnapshot?(snapshot)
+    }
     func setGimbalPitch(_ pitch: Double, completion: @escaping (Result<Void, Error>) -> Void) {
         completion(.failure(AdapterError.unavailable("DJI SDK is not installed.")))
     }

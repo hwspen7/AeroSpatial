@@ -28,3 +28,21 @@ The Python journal supports random indexed reads. Swift currently provides a bou
 The existing diagnostic JSON envelope remains readable without an explicit version. Version `2` adds `upstreamMissing`, `sampled`, and `rejected` event counts, plus optional `alignedNs` and `uncertaintyNs` as a **pair**. A version `1` downgrade is rejected if any such information would be lost. This format describes diagnostic metadata and is distinct from the existing versioned flight-session JSONL records.
 
 The new provenance counters do not equate a missing observation to a lost packet: up-stream capture gaps, deliberate sampling, subscriber overwritten messages, and rejected published events are distinct categories.
+
+## Application recording integration
+
+The iOS `SessionRecorder` now uses a bounded `SegmentJournalSink`, rather than
+writing every JSONL record synchronously on the main actor. The queue stores
+versioned JSON session objects as CRC-framed binary records, rotates segments,
+fsyncs admitted records, and preserves older sessions until explicit user action.
+Recording failure is surfaced when the next event is submitted or the queue is
+flushed. The app's export target is now a session **directory**, not a JSONL file.
+To create a portable JSONL file, copy the session folder and run:
+
+```sh
+PYTHONPATH=Toolkit python -m aerospatial_tools journal-export flight-directory exported.jsonl
+PYTHONPATH=Toolkit python -m aerospatial_tools validate exported.jsonl
+```
+
+This conversion is an explicit action and refuses overwriting existing files.
+A directory is not a single video or archive; use a file-manager export on iOS.

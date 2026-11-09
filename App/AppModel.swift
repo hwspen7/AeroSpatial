@@ -51,16 +51,30 @@ final class AppModel: ObservableObject {
     let spatialBus = try? SpatialBus()
     var tracking = HeadTrackingController()
     var commandGate = GimbalCommandGate()
+    var onlineClock = OnlineClockCoordinator()
     var sensorHealth = SensorHealthMonitor()
+    let safetySupervisor = SafetySupervisor()
+    var runtimeMetrics = RuntimeMetrics()
+    var lastRuntimeUpdate = 0.0
+    @Published var runtimeP95Microseconds: UInt64?
+    @Published var busPayloadBytes: UInt64?
+    @Published var videoOverwritten: UInt64?
+    @Published var journalQueuedBytes: Int?
+    @Published var residentBytes: UInt64?
+    @Published var thermalStatus: String = "Unknown"
     var synchronizer = SensorSynchronizer()
     var spatialAwareness = HeadRelativeAwareness()
     var advisor = PassiveAdvisor()
     var adapter: DroneAdapter = SimulatorDroneAdapter()
     var controlTimer: Timer?
+    var headDrainTimer: Timer?
     var demoInputEnabled = false
     var started = false
 
     init() {
+        motion.onClockPair = { [weak self] source, host in
+            _ = self?.onlineClock.observe(domain: 2, source: source, host: host)
+        }
         motion.onSample = { [weak self] sample in
             guard let self = self else { return }
             self.demoInputEnabled = false
@@ -94,6 +108,9 @@ final class AppModel: ObservableObject {
         guard !started else { return }
         started = true
         adapter.connect()
+        headDrainTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 30.0, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated { self?.motion.drainLatest() }
+        }
         controlTimer = Timer.scheduledTimer(withTimeInterval: 0.15, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated { self?.controlTick() }
         }
@@ -109,9 +126,12 @@ final class AppModel: ObservableObject {
         audio.silence()
         controlTimer?.invalidate()
         controlTimer = nil
+        headDrainTimer?.invalidate()
+        headDrainTimer = nil
         adapter.disconnect()
         commandGate.reset()
         sensorHealth.reset()
+        onlineClock.resetAll()
         headStreamQuality = nil
         aircraftStreamQuality = nil
         if recording { stopRecording() }
@@ -131,6 +151,7 @@ final class AppModel: ObservableObject {
         synchronizer.reset()
         commandGate.reset()
         sensorHealth.reset()
+        onlineClock.resetAll()
         headStreamQuality = nil
         aircraftStreamQuality = nil
         synchronized = false
@@ -147,6 +168,9 @@ final class AppModel: ObservableObject {
 
     func configureAdapter() {
         adapter = DroneAdapterFactory.make(mode)
+        #if canImport(DJISDK)
+        (adapter as? DJIAdapter)?.onVideoBus = spatialBus
+        #endif
         capabilities = mode == .simulation ? .simulator : .unverifiedDJI
         aircraft = adapter.snapshot
         adapter.onSnapshot = { [weak self] snapshot in
@@ -186,6 +210,9 @@ final class AppModel: ObservableObject {
             self.log("telemetry", source: snapshot.source.rawValue, fields: fields)
         }
         adapter.onStatus = { [weak self] status in self?.show(status) }
+        adapter.onCapabilities = { [weak self] discovered in
+            self?.capabilities = discovered
+        }
         if let simulator = adapter as? SimulatorDroneAdapter {
             simulator.updatePilotPosition(location)
         }

@@ -71,6 +71,9 @@ def main(argv: list[str] | None = None) -> int:
     workload_cmd = commands.add_parser("workload", help="Reproducible optional-compute overload experiment")
     workload_cmd.add_argument("--samples", type=int, default=3000)
     workload_cmd.add_argument("--seed", type=int, default=7)
+    export_cmd = commands.add_parser("journal-export", help="Verify and export CRC journal segments as JSONL")
+    export_cmd.add_argument("source", type=Path)
+    export_cmd.add_argument("destination", type=Path)
     video_cmd = commands.add_parser("video-probe", help="Decode offline video and inspect frame timing")
     video_cmd.add_argument("path", type=Path)
     video_cmd.add_argument("--max-frames", type=int, default=2000)
@@ -82,7 +85,12 @@ def main(argv: list[str] | None = None) -> int:
     bench.add_argument("--iterations", type=int, default=5)
     args = parser.parse_args(argv)
     try:
-        if args.command == "video-probe":
+        if args.command == "journal-export":
+            from .journal_export import export_journal
+            result = {"exported_records": export_journal(args.source, args.destination),
+                      "destination": str(args.destination)}
+            status = 0
+        elif args.command == "video-probe":
             from .vision_cli import inspect_video
             result, status = inspect_video(args.path, maximum_frames=args.max_frames), 0
         elif args.command == "vision-match":

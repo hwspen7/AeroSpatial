@@ -81,6 +81,19 @@ extension DashboardView {
                      "Aircraft: \(aircraft.accepted) accepted, \(aircraft.rejected) rejected, \(aircraft.observedGaps) gaps.")
                     .font(.caption).foregroundStyle(.secondary)
             }
+            HStack(spacing: 12) {
+                metric("Control p95", model.runtimeP95Microseconds.map { "\($0) µs ≤" } ?? "—")
+                metric("Payload", model.busPayloadBytes.map { "\($0 / 1024) KiB" } ?? "—")
+            }
+            HStack(spacing: 12) {
+                metric("Video drops", model.videoOverwritten.map(String.init) ?? "—")
+                metric("Write queue", model.journalQueuedBytes.map { "\($0 / 1024) KiB" } ?? "—")
+                metric("Thermal", model.thermalStatus)
+            }
+            if let rss = model.residentBytes {
+                Text("Process memory: \(rss / 1024 / 1024) MiB. GPU profiling requires Instruments.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
             Label(model.commandGate.pending == nil ? "No command in flight" : "Awaiting gimbal callback",
                   systemImage: model.commandGate.pending == nil ? "checkmark.shield" : "clock.arrow.circlepath")
                 .font(.caption).foregroundStyle(.secondary)
@@ -97,7 +110,7 @@ extension DashboardView {
 
     var recordingCard: some View {
         card("Session recorder", icon: "externaldrive.badge.timemachine") {
-            Text("Head pose, aircraft telemetry, calibration events and gimbal commands are stored as newline-delimited JSON for offline replay.")
+            Text("Events are stored in bounded, CRC-protected binary journal segments. Export and decode them with the offline toolkit.")
                 .font(.caption).foregroundStyle(.secondary)
             HStack {
                 Button(model.recording ? "Stop recording" : "Start recording") {

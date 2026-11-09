@@ -88,6 +88,11 @@ extension AppModel {
             show("Head motion is stale. Reconnect or move the head, then calibrate again.")
             return
         }
+        let admission = safetyDecision(at: ProcessInfo.processInfo.systemUptime, authorized: true)
+        guard admission == .permitted else {
+            show("Safety supervisor blocked arming: \(admission.rawValue).")
+            return
+        }
         commandGate.reset()
         armed = true
         show(mode == .simulation ? "Simulator gimbal control enabled." :
@@ -111,11 +116,23 @@ extension AppModel {
             return
         }
         let now = ProcessInfo.processInfo.systemUptime
+        let workStart = now
+        defer { updateRuntimeMetrics(durationSeconds: ProcessInfo.processInfo.systemUptime - workStart,
+                                     now: ProcessInfo.processInfo.systemUptime) }
         if armed && commandGate.checkTimeout(now: now) {
             log("command_timeout", source: "safety", note: "Gimbal callback deadline exceeded")
             disarm()
             show("Gimbal acknowledgement timed out. Recalibrate and explicitly re-arm.")
             return
+        }
+        if armed {
+            let safety = safetyDecision(at: now, authorized: true)
+            if safety != .permitted && safety != .pendingCommand {
+                log("safety_stop", source: "supervisor", note: safety.rawValue)
+                disarm()
+                show("Safety supervisor stopped assistance: \(safety.rawValue).")
+                return
+            }
         }
         let streams = sensorHealth.health(at: now)
         headStreamQuality = streams.head
