@@ -38,11 +38,19 @@ extension AppModel {
     }
 
     func stopRecording() {
+        guard recording else { return }
         log("session_end", source: "app")
-        recorder.stop()
         recording = false
-        latestSession = recorder.lastSavedURL
-        show("Session saved. Export the JSONL log from the app.")
+        recorder.stop { [weak self] outcome in
+            guard let self else { return }
+            switch outcome {
+            case .success(let url):
+                self.latestSession = url
+                self.show("Session saved. Export the JSONL log from the app.")
+            case .failure(let error):
+                self.show("Recording flush failed: \(error.localizedDescription)")
+            }
+        }
     }
 
     func log(_ kind: String, source: String,
@@ -52,8 +60,7 @@ extension AppModel {
                                    kind: kind, source: source, fields: fields, note: note)
         do { try recorder.write(record) }
         catch {
-            recorder.stop()
-            recording = false
+            stopRecording()
             show("Recording halted after write failure: \(error.localizedDescription)")
         }
     }
