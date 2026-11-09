@@ -24,6 +24,7 @@ jobs:
           xz -dc .transfer/multimodal.patch.xz > /tmp/aerospatial-multimodal.patch
           git apply --check /tmp/aerospatial-multimodal.patch
           git apply /tmp/aerospatial-multimodal.patch
+          git restore --source=HEAD -- .github/workflows/core-tests.yml
           rm -rf .transfer
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
