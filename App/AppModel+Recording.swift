@@ -42,7 +42,11 @@ extension AppModel {
         recorder.stop()
         recording = false
         latestSession = recorder.lastSavedURL
-        show("Session saved. Export the JSONL log from the app.")
+        if let failure = recorder.lastFailure {
+            show("Session storage error: \(failure)")
+        } else {
+            show("Session saved as CRC-framed segments. Export with the offline journal tool.")
+        }
     }
 
     func log(_ kind: String, source: String,

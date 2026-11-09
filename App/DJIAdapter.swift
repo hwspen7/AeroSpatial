@@ -12,8 +12,14 @@ final class DJIAdapter: NSObject, DroneAdapter {
                                     source: .dji, connected: false, flying: false)
     var onSnapshot: ((AircraftSnapshot) -> Void)?
     var onStatus: ((String) -> Void)?
+    var onCapabilities: ((DeviceCapabilities) -> Void)?
+    var onVideoBus: SpatialBus? {
+        didSet { videoIngress?.stop(); videoIngress = onVideoBus.map(DJIVideoIngress.init(bus:)) }
+    }
+    private var videoIngress: DJIVideoIngress?
     private var pendingPitchCommand = false
     private var pollTimer: Timer?
+    nonisolated private let flightMailbox = LatestSnapshotMailbox<AircraftSnapshot>()
 
     func connect() {
         guard let key = Bundle.main.object(forInfoDictionaryKey: "DJISDKAppKey") as? String,
@@ -29,6 +35,9 @@ final class DJIAdapter: NSObject, DroneAdapter {
         pollTimer?.invalidate()
         pollTimer = nil
         snapshot.connected = false
+        _ = flightMailbox.takeLatest()
+        onCapabilities?(.unverifiedDJI)
+        videoIngress?.stop()
         pendingPitchCommand = false
         onSnapshot?(snapshot)
         // Aircraft stays under physical remote control. This does not disconnect the remote.
@@ -68,11 +77,19 @@ final class DJIAdapter: NSObject, DroneAdapter {
 
     private func refreshTelemetry() {
         let connected = (DJISDKManager.product() as? DJIAircraft)?.isConnected ?? false
-        guard connected != snapshot.connected else { return }
-        snapshot.connected = connected
+        if connected != snapshot.connected {
+            snapshot.connected = connected
+            onSnapshot?(snapshot)
+        }
+        guard connected, let newest = flightMailbox.takeLatest() else { return }
+        snapshot.uptime = newest.uptime
+        snapshot.position = newest.position
+        snapshot.altitudeMeters = newest.altitudeMeters
+        snapshot.headingDegrees = newest.headingDegrees
+        snapshot.flying = newest.flying
         onSnapshot?(snapshot)
-        // Never mark stale telemetry as fresh merely because a connection was polled.
     }
+
 }
 
 extension DJIAdapter: DJISDKManagerDelegate {
@@ -96,13 +113,19 @@ extension DJIAdapter: DJISDKManagerDelegate {
                 return
             }
             self.snapshot.connected = true
+            let evidence = CapabilityEvidence(productModel: aircraft.model ?? "dji-unknown",
+                connected: true, flightControllerPresent: aircraft.flightController != nil,
+                cameraPresent: aircraft.camera != nil, gimbalPresent: aircraft.gimbal != nil,
+                source: .dji)
+            self.onCapabilities?(evidence.observedCapabilities)
+            self.videoIngress?.start()
             self.onSnapshot?(self.snapshot)
             self.onStatus?("Aircraft connected. Confirm model, gimbal capability and firmware.")
             aircraft.flightController?.delegate = self
             aircraft.gimbal?.delegate = self
             aircraft.battery?.delegate = self
             self.pollTimer?.invalidate()
-            self.pollTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
+            self.pollTimer = Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { [weak self] _ in
                 MainActor.assumeIsolated { self?.refreshTelemetry() }
             }
         }
@@ -118,22 +141,18 @@ extension DJIAdapter: DJISDKManagerDelegate {
 
 extension DJIAdapter: DJIFlightControllerDelegate {
     nonisolated func flightController(_ fc: DJIFlightController, didUpdate state: DJIFlightControllerState) {
-        let location = state.aircraftLocation
-        let coordinate = location?.coordinate
-        let locationSample = coordinate.map { GeoPoint(latitude: $0.latitude, longitude: $0.longitude) }
-        let altitude = state.altitude
+        let coordinate = state.aircraftLocation?.coordinate
+        let point = coordinate.map { GeoPoint(latitude: $0.latitude, longitude: $0.longitude) }
+        let altitude = Double(state.altitude)
         let heading = Double(state.attitude.yaw)
-        let flying = state.isFlying
-        Task { @MainActor [weak self] in
-            guard let self = self else { return }
-            self.snapshot.uptime = ProcessInfo.processInfo.systemUptime
-            self.snapshot.position = locationSample?.isValid == true ? locationSample : nil
-            self.snapshot.altitudeMeters = altitude.isFinite ? Double(altitude) : nil
-            self.snapshot.headingDegrees = heading.isFinite ? Angle.compassDegrees(heading) : nil
-            self.snapshot.flying = flying
-            self.onSnapshot?(self.snapshot)
-        }
+        let observation = AircraftSnapshot(uptime: ProcessInfo.processInfo.systemUptime,
+            source: .dji, connected: true, flying: state.isFlying,
+            position: point?.isValid == true ? point : nil,
+            altitudeMeters: altitude.isFinite ? altitude : nil,
+            headingDegrees: heading.isFinite ? Angle.compassDegrees(heading) : nil)
+        flightMailbox.offer(observation)
     }
+
 }
 
 extension DJIAdapter: DJIGimbalDelegate {

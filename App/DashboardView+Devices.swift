@@ -36,6 +36,13 @@ extension DashboardView {
             Label(model.synchronized ? "Time-aligned sensors available" : "Waiting for synchronized sensor inputs",
                   systemImage: model.synchronized ? "checkmark.circle" : "clock")
                 .font(.caption).foregroundStyle(.secondary)
+            #if canImport(DJISDK) && canImport(DJIWidget)
+            if model.mode == .dji && model.aircraft.connected {
+                DJIVideoPreview()
+                    .aspectRatio(16.0 / 9.0, contentMode: .fit)
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+            }
+            #endif
             Text("Real DJI connection requires an SDK-equipped Mac build and a registered App Key. Simulation works without hardware.")
                 .font(.caption).foregroundStyle(.secondary)
         }
