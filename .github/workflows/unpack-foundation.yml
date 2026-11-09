@@ -7,6 +7,9 @@ on:
   workflow_dispatch:
 permissions:
   contents: write
+concurrency:
+  group: foundation-publish
+  cancel-in-progress: false
 jobs:
   unpack:
     if: github.actor != 'github-actions[bot]'
@@ -15,40 +18,41 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: true
-      - name: Verify parts and expand sources
+      - name: Verify and expand signed-by-digest source snapshot
         shell: bash
         run: |
           python3 - <<'PY'
-          import base64, io, lzma, pathlib, tarfile, sys
-          folder = pathlib.Path('bootstrap')
-          parts = sorted(folder.glob('part-*.txt'))
+          import base64, hashlib, io, lzma, pathlib, tarfile, sys
+          root = pathlib.Path("bootstrap")
+          parts = sorted(root.glob("part-*.txt"))
           if len(parts) != 15:
-              print(f'Waiting for 15 archive parts; found {len(parts)}.')
+              print(f"Waiting for 15 archive chunks; found {len(parts)}.")
               sys.exit(0)
-          payload = ''.join(p.read_text().strip() for p in parts)
-          import hashlib
-          encoded = base64.b64decode(payload, validate=True)
-          assert hashlib.sha256(encoded).hexdigest() == 'ca529e731c0021ed001c7bcdac7401a599fad7bce136adfb5711d18046d95d2f'
-          archive = lzma.decompress(encoded)
-          with tarfile.open(fileobj=io.BytesIO(archive), mode='r:') as tf:
-              for entry in tf.getmembers():
+          encoded = base64.b64decode("".join(x.read_text().strip() for x in parts), validate=True)
+          actual = hashlib.sha256(encoded).hexdigest()
+          expected = "0adcf38986b5116dc185fd39610a95140399bb730c431aa7670570b3356ff632"
+          if actual != expected:
+              raise ValueError(f"Source digest mismatch: {actual}")
+          payload = lzma.decompress(encoded)
+          with tarfile.open(fileobj=io.BytesIO(payload), mode="r:") as source:
+              for entry in source.getmembers():
                   path = pathlib.PurePosixPath(entry.name)
-                  if entry.issym() or entry.islnk() or entry.isdev() or path.is_absolute() or '..' in path.parts:
-                      raise ValueError('Unsafe source archive path')
-              tf.extractall('.', filter='data')
-          for p in parts:
-              p.unlink()
-          folder.rmdir()
-          print('Source tree reconstructed.')
+                  if entry.issym() or entry.islnk() or entry.isdev() or path.is_absolute() or ".." in path.parts:
+                      raise ValueError("Unsafe archive entry")
+              source.extractall(".", filter="data")
+          for part in parts: part.unlink()
+          root.rmdir()
+          pathlib.Path(".github/workflows/unpack-foundation.yml").unlink()
+          print("Verified snapshot expanded.")
           PY
-      - name: Commit expanded tree
+      - name: Commit published source
         shell: bash
         run: |
-          if [ -d bootstrap ]; then echo 'Waiting for remaining parts'; exit 0; fi
+          if [ -d bootstrap ]; then exit 0; fi
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add -A
           if ! git diff --cached --quiet; then
-            git commit -m 'feat: publish AeroSpatial v0.4.0 source foundation'
+            git commit -m 'feat: publish streamlined high-performance AeroSpatial foundation'
             git push origin HEAD:main
           fi
