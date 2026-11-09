@@ -1,0 +1,13 @@
+[
+  {
+    "identifier": "scene-detector",
+    "revision": "1.2.0",
+    "backend": "coreml",
+    "relativePath": "scene-model.mlmodelc",
+    "sha256": "86d9e3dc9ac786174e1d124fe8b10123bb3c554bc890d26f756f830d96c33c11",
+    "memoryBytes": 104857600,
+    "typicalLatencyMs": 30.0,
+    "inputStream": 3,
+    "outputStream": 4
+  }
+]

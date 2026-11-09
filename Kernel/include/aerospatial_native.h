@@ -84,4 +84,5 @@ ASStatus as_stereo_pan(double relative_bearing_deg, double *pan_out);
 #ifdef __cplusplus
 }
 #endif
+#include "aerospatial_adaptive.h"
 #endif

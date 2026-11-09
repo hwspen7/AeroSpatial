@@ -78,3 +78,13 @@
 - Added synthetic-ground-truth PnP, triangulation, checkerboard calibration, pose graph, bundle and statistical covariance tests.
 - Added optional reproducible `spatial-demo` command and CI spatial-estimation job.
 - Retained explicit limits for unverified Mavic Air 2 raw IMU availability and actual video/clock calibration.
+
+## P2 portable developer and spatial interfaces (2026-11-09)
+
+- Added allocation-free native optional-compute quality adaptation and head-look preview with Swift C ABI facade.
+- Added Swift model manifests and time-scoped extrinsic calibration lookup with explicit clock and uncertainty rules.
+- Added Python digest-verified model catalog, pinned-seed experiment harness, confidence interval metrics and regression comparison.
+- Added offline fault replay, two-phase derived-data retention, provenance-indexed SQLite observations and strict ROS2 pose serialization.
+- Added P2 CLI and negative tests without enabling live flight or unverified hardware behavior.
+
+- Added trusted optional-worker lifecycle supervision with explicit quarantine and operator reset.

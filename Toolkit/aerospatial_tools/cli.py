@@ -79,12 +79,72 @@ def main(argv: list[str] | None = None) -> int:
     match_cmd.add_argument("query", type=Path)
     spatial = commands.add_parser("spatial-demo", help="Run seeded metric geometry and optimization validation")
     spatial.add_argument("--seed", type=int, default=42)
+    model_cmd = commands.add_parser("model-check", help="Verify offline model catalog and file hashes")
+    model_cmd.add_argument("root", type=Path)
+    model_cmd.add_argument("manifest", type=Path)
+    experiment_cmd = commands.add_parser("experiment-errors", help="Reproducible error evaluation for JSONL")
+    experiment_cmd.add_argument("dataset", type=Path)
+    experiment_cmd.add_argument("sha256")
+    experiment_cmd.add_argument("--seed", type=int, default=42)
+    experiment_cmd.add_argument("--algorithm", default="offline-evaluator")
+    experiment_cmd.add_argument("--revision", default="1.0.0")
+    retention_cmd = commands.add_parser("retention-plan", help="Dry-run derived archive retention")
+    retention_cmd.add_argument("directory", type=Path)
+    retention_cmd.add_argument("--keep", type=int, default=2)
+    retention_cmd.add_argument("--days", type=int, default=30)
+    retention_cmd.add_argument("--now-ns", type=int, required=True)
+    faults = commands.add_parser("replay-faults", help="Generate seeded synthetic arrival patterns")
+    faults.add_argument("input", type=Path)
+    faults.add_argument("--seed", type=int, default=42)
     bench = commands.add_parser("benchmark", help="Measure offline streaming throughput")
     bench.add_argument("--count", type=int, default=100000)
     bench.add_argument("--iterations", type=int, default=5)
     args = parser.parse_args(argv)
     try:
-        if args.command == "spatial-demo":
+        if args.command == "model-check":
+            from .model_catalog import ModelArtifact, ModelCatalog
+            models = json.loads(args.manifest.read_text(encoding='utf-8'))
+            if type(models) is not list or len(models) > 256:
+                raise ValueError('invalid model manifest list')
+            catalog = ModelCatalog(args.root)
+            checked = []
+            for entry in models:
+                if type(entry) is not dict or set(entry) != {
+                    'identifier', 'revision', 'backend', 'relativePath', 'sha256',
+                    'memoryBytes', 'typicalLatencyMs', 'inputStream', 'outputStream'
+                }:
+                    raise ValueError('invalid model declaration fields')
+                model = ModelArtifact(entry['identifier'], entry['revision'], entry['backend'],
+                    entry['relativePath'], entry['sha256'], entry['memoryBytes'],
+                    entry['typicalLatencyMs'], entry['inputStream'], entry['outputStream'])
+                catalog.add(model)
+                checked.append(model.identifier + '@' + model.revision)
+            result, status = {'verified': checked, 'count': len(checked)}, 0
+        elif args.command == 'experiment-errors':
+            from .experiments import ExperimentSpec, evaluate_experiment
+            spec = ExperimentSpec(args.dataset, args.sha256, args.seed,
+                                  args.algorithm, args.revision)
+            def errors(path, _rng):
+                values = []
+                with path.open('r', encoding='utf-8') as stream:
+                    for line in stream:
+                        values.append(json.loads(line)['error'])
+                        if len(values) > 1_000_000:
+                            raise ValueError('too many experiment error samples')
+                return values
+            result, status = evaluate_experiment(spec, errors), 0
+        elif args.command == 'retention-plan':
+            from .retention import RetentionPolicy, plan_retention
+            plan = plan_retention(args.directory,
+                 RetentionPolicy(args.keep, args.days * 86400), now_ns=args.now_ns)
+            result, status = {'planDigest': plan.plan_digest,
+                               'candidates': [item[0] for item in plan.candidates],
+                               'mode': 'dry-run'}, 0
+        elif args.command == 'replay-faults':
+            from .device_replay import FaultProfile, replay_faults
+            events = json.loads(args.input.read_text(encoding='utf-8'))
+            result, status = replay_faults(events, FaultProfile(seed=args.seed)), 0
+        elif args.command == "spatial-demo":
             from .spatial_demo import run
             result = run(seed=args.seed)
             status = 0 if result["status"] == "passed" else 1

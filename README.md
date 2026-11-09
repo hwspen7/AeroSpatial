@@ -365,3 +365,16 @@ See [Mathematical foundation](Docs/MATHEMATICAL_FOUNDATION.md) and
 The observation-only P0 building blocks add a bounded real-time mailbox, native atomic latency histogram, uncertainty-aware clock registry, device-evidence expiration, fail-closed safety assessment, encoded-frame routing, and asynchronous CRC-framed journal writes. See [runtime acceptance and remaining hardware gates](Docs/RUNTIME_FOUNDATION.md). These are portable components, **not** a claim of completed DJI/iPhone hardware integration.
 
 The application now forwards head and telemetry publications through `SpatialIngressPublisher` on a utility worker and writes its legacy JSONL sessions through a bounded asynchronous writer. This does not constitute a complete VideoToolbox/DJI hardware integration or a finished segment-journal UI migration.
+
+## P2 developer and spatial-intelligence extensions
+
+The next portable layer adds a **native optional-compute quality governor**,
+short-horizon head-look previews, time-scoped frame calibration, typed Swift
+model declarations, verified offline model artifacts, reproducible experiment
+reports, deterministic receive-side fault simulation, SQLite spatial evidence,
+conservative derived-log retention and ROS2-compatible pose serialization.
+
+These are reusable implementation components, not a claim that Mavic Air 2
+hardware, live Core ML execution, ROS2 networking, georeferencing or flight
+safety has been certified. See [P2 architecture](Docs/P2_PLATFORM.md) and
+[P2 acceptance](Docs/P2_ACCEPTANCE.md) for the precise boundaries and test gates.

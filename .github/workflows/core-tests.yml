@@ -140,3 +140,18 @@ jobs:
           python -m unittest discover -s ToolkitTests -p '*_p1.py' -v
           python -m aerospatial_tools spatial-demo --seed 42
           python -m aerospatial_tools spatial-demo --seed 77
+
+  p2-developer-contracts:
+    name: P2 developer contracts and replay safety
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Test content identity, experimental determinism and retention policies
+        env:
+          PYTHONPATH: Toolkit
+        run: |
+          python -m unittest discover -s ToolkitTests -p 'test_p2_*.py' -v
+          python -m aerospatial_tools --help
