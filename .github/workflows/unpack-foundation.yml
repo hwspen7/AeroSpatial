@@ -22,11 +22,14 @@ jobs:
           import base64, io, lzma, pathlib, tarfile, sys
           folder = pathlib.Path('bootstrap')
           parts = sorted(folder.glob('part-*.txt'))
-          if len(parts) != 5:
-              print(f'Waiting for 5 archive parts; found {len(parts)}.')
+          if len(parts) != 15:
+              print(f'Waiting for 15 archive parts; found {len(parts)}.')
               sys.exit(0)
           payload = ''.join(p.read_text().strip() for p in parts)
-          archive = lzma.decompress(base64.b64decode(payload, validate=True))
+          import hashlib
+          encoded = base64.b64decode(payload, validate=True)
+          assert hashlib.sha256(encoded).hexdigest() == 'ca529e731c0021ed001c7bcdac7401a599fad7bce136adfb5711d18046d95d2f'
+          archive = lzma.decompress(encoded)
           with tarfile.open(fileobj=io.BytesIO(archive), mode='r:') as tf:
               for entry in tf.getmembers():
                   path = pathlib.PurePosixPath(entry.name)
