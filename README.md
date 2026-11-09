@@ -58,6 +58,30 @@ frames**, and capture timestamps, SDK linking and hardware remain unverified.
 For portable tests and separate physical acceptance gates, see
 [P0 acceptance](Docs/P0_ACCEPTANCE.md).
 
+
+## Spatial estimation and metric geometry (P1)
+
+The device-independent mathematical layer includes a C++17 **15-error-state
+inertial estimator** (position, velocity, quaternion, sensor biases), SE(3)
+exponential/logarithmic maps and covariance propagation, with Swift facades.
+Optional Python mapping references add calibrated PnP and epipolar odometry,
+parallax-checked triangulation, a fixed-lag out-of-order sensor replay, robust
+6-DoF pose graphs, metric-anchored bundle adjustment, bounded sparse landmark
+indexing, loop evidence validation, intrinsic calibration, uncertainty analysis
+and reproducible motion-model comparison.
+
+These are **portable software components**, not a claimed flight-validated
+inertial navigation or live SLAM system. Monocular translation has unknown
+scale unless external metric evidence fixes it; raw inertial samples and
+real camera calibration have not been verified on Mavic Air 2. See
+[math and coordinate contracts](Docs/P1_SPATIAL_ESTIMATION.md) and
+[the P1 acceptance matrix](Docs/P1_ACCEPTANCE.md).
+
+```bash
+python -m pip install -e './Toolkit[mapping]'
+PYTHONPATH=Toolkit python -m aerospatial_tools spatial-demo --seed 42
+```
+
 ## Architecture
 
 ```mermaid

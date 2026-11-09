@@ -70,3 +70,11 @@
 - Add strict bus diagnostic format migration and explicit loss provenance counters.
 - Add clock uncertainty envelopes, validated encoded-video ingress and evidence-only frame association.
 - Add multi-producer soak, latency histogram, performance gate and extended CI verification.
+
+## Spatial estimation and geometry
+
+- Added native SE(3) pose operations, left-adjoint covariance composition and 15-error-state inertial filtering.
+- Added Swift typed pose/estimator interfaces, fixed-lag delayed-position fusion, metric visual geometry and robust optimization references.
+- Added synthetic-ground-truth PnP, triangulation, checkerboard calibration, pose graph, bundle and statistical covariance tests.
+- Added optional reproducible `spatial-demo` command and CI spatial-estimation job.
+- Retained explicit limits for unverified Mavic Air 2 raw IMU availability and actual video/clock calibration.

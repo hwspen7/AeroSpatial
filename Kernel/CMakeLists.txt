@@ -15,6 +15,8 @@ add_library(aerospatial_native STATIC
     "${NATIVE_ROOT}/camera.cpp"
     "${NATIVE_ROOT}/calibration.cpp"
     "${NATIVE_ROOT}/tracking.cpp"
+    "${NATIVE_ROOT}/pose.cpp"
+    "${NATIVE_ROOT}/inertial.cpp"
     "${NATIVE_ROOT}/runtime_metrics.cpp"
     "${NATIVE_ROOT}/h264.cpp"
     "${NATIVE_ROOT}/bus_core.cpp"
@@ -35,7 +37,7 @@ target_link_libraries(aerospatial-qos-probe PRIVATE aerospatial_native)
 target_link_libraries(aerospatial-wire-probe PRIVATE aerospatial_native)
 if(BUILD_TESTING)
     target_compile_definitions(aerospatial_native PRIVATE AEROSPATIAL_TEST_HOOKS)
-    foreach(name geometry orientation filter frames slerp transform batch bus bus_concurrency bus_resources bus_budget_race bus_faults bus_soak wire qos camera calibration tracking runtime_metrics h264)
+    foreach(name geometry orientation filter frames slerp transform batch bus bus_concurrency bus_resources bus_budget_race bus_faults bus_soak wire qos camera calibration tracking runtime_metrics h264 estimation)
         add_executable(test_${name} "../NativeTests/test_${name}.cpp")
         target_link_libraries(test_${name} PRIVATE aerospatial_native)
         add_test(NAME native_${name} COMMAND test_${name})
@@ -52,4 +54,10 @@ option(AEROSPATIAL_BUILD_BENCHMARKS "Build native benchmark executable" OFF)
 if(AEROSPATIAL_BUILD_BENCHMARKS)
     add_executable(aerospatial-bench "benchmark.cpp")
     target_link_libraries(aerospatial-bench PRIVATE aerospatial_native)
+endif()
+
+option(AEROSPATIAL_BUILD_ESTIMATION_BENCHMARK "Build inertial estimator benchmark" OFF)
+if(AEROSPATIAL_BUILD_ESTIMATION_BENCHMARK)
+    add_executable(aerospatial-estimation-bench "estimation_benchmark.cpp")
+    target_link_libraries(aerospatial-estimation-bench PRIVATE aerospatial_native)
 endif()

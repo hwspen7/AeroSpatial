@@ -77,12 +77,18 @@ def main(argv: list[str] | None = None) -> int:
     match_cmd = commands.add_parser("vision-match", help="Estimate visual place overlap using ORB and RANSAC")
     match_cmd.add_argument("reference", type=Path)
     match_cmd.add_argument("query", type=Path)
+    spatial = commands.add_parser("spatial-demo", help="Run seeded metric geometry and optimization validation")
+    spatial.add_argument("--seed", type=int, default=42)
     bench = commands.add_parser("benchmark", help="Measure offline streaming throughput")
     bench.add_argument("--count", type=int, default=100000)
     bench.add_argument("--iterations", type=int, default=5)
     args = parser.parse_args(argv)
     try:
-        if args.command == "video-probe":
+        if args.command == "spatial-demo":
+            from .spatial_demo import run
+            result = run(seed=args.seed)
+            status = 0 if result["status"] == "passed" else 1
+        elif args.command == "video-probe":
             from .vision_cli import inspect_video
             result, status = inspect_video(args.path, maximum_frames=args.max_frames), 0
         elif args.command == "vision-match":
