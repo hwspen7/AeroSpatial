@@ -4,6 +4,7 @@
 #include <stddef.h>
 #include "aerospatial_wire.h"
 #include "aerospatial_qos.h"
+#include "aerospatial_realtime.h"
 
 #ifdef __cplusplus
 extern "C" {

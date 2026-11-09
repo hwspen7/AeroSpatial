@@ -5,4 +5,5 @@ project 'AeroSpatial.xcodeproj'
 # CocoaPods pulls the binary SDK, which is not redistributed in this repository.
 target 'AeroSpatial' do
   pod 'DJI-SDK-iOS', '4.16.2'
+  pod 'DJIWidget', '~> 1.6.3'
 end
