@@ -24,7 +24,7 @@ typedef struct {
     double drift_uncertainty_ppm;
     unsigned int inliers, rejected;
 } ASClockFit;
-/* Huber-resistant initial slope via pairwise median, median intercept, then
+/* Theil-Sen initial slope via pairwise median, median intercept, then
    least-squares refit on residual-gated inliers. May reject bad calibration. */
 ASStatus as_clock_fit_robust(const ASClockSample *samples, size_t count,
                              double maximum_drift_ppm, double residual_gate_seconds,
