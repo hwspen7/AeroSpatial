@@ -1,0 +1,7 @@
+{
+  "minimum_head_samples": 50,
+  "minimum_telemetry_samples": 10,
+  "maximum_sensor_command_p95_ms": 400,
+  "maximum_semantic_errors": 0,
+  "maximum_integrity_issues": 0
+}

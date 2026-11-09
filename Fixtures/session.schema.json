@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/hwspen7/AeroSpatial/blob/main/Fixtures/session.schema.json",
+  "title": "AeroSpatial versioned JSONL event",
+  "description": "One schema v1 JSON object per UTF-8 line. Legacy unversioned events remain readable.",
+  "type": "object",
+  "required": ["schemaVersion", "sessionId", "sequence", "wallTime", "uptime", "kind", "source", "fields"],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "sessionId": {"type": "string", "minLength": 1, "maxLength": 128},
+    "sequence": {"type": "integer", "minimum": 0},
+    "wallTime": {"type": "string", "format": "date-time"},
+    "uptime": {"type": "number"},
+    "kind": {"type": "string", "minLength": 1},
+    "source": {"type": "string", "minLength": 1},
+    "fields": {"type": "object", "maxProperties": 128, "additionalProperties": {"type": "number"}},
+    "note": {"type": "string"}
+  },
+  "additionalProperties": false
+}

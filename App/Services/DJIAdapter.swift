@@ -1,0 +1,156 @@
+#if canImport(DJISDK)
+import Foundation
+import DJISDK
+import AeroSpatialCore
+
+/// DJI MSDK V4 bridge. Build and hardware verification require a Mac, a DJI App Key,
+/// a supported controller and a Mavic Air 2. No aircraft flight control is implemented.
+@MainActor
+final class DJIAdapter: NSObject, DroneAdapter {
+    let title = "DJI Mavic Air 2"
+    var snapshot = AircraftSnapshot(uptime: ProcessInfo.processInfo.systemUptime,
+                                    source: .dji, connected: false, flying: false)
+    var onSnapshot: ((AircraftSnapshot) -> Void)?
+    var onStatus: ((String) -> Void)?
+    private var pendingPitchCommand = false
+    private var pollTimer: Timer?
+
+    func connect() {
+        guard let key = Bundle.main.object(forInfoDictionaryKey: "DJISDKAppKey") as? String,
+              !key.isEmpty, !key.contains("REPLACE_") else {
+            onStatus?("DJI App Key is missing. Add the key to App/Info.plist and match the bundle ID.")
+            return
+        }
+        onStatus?("Registering DJI SDK. Aircraft connection is not yet established.")
+        DJISDKManager.registerApp(with: self)
+    }
+
+    func disconnect() {
+        pollTimer?.invalidate()
+        pollTimer = nil
+        snapshot.connected = false
+        pendingPitchCommand = false
+        onSnapshot?(snapshot)
+        // Aircraft stays under physical remote control. This does not disconnect the remote.
+    }
+
+    func setGimbalPitch(_ pitch: Double, completion: @escaping (Result<Void, Error>) -> Void) {
+        guard BenchSafety.allowsExperimentalGimbal, !snapshot.flying else {
+            completion(.failure(AdapterError.unavailable("Hardware pitch control requires the explicit propeller-off bench build.")))
+            return
+        }
+        guard snapshot.connected, let aircraft = DJISDKManager.product() as? DJIAircraft,
+              let gimbal = aircraft.gimbal else {
+            completion(.failure(AdapterError.disconnected))
+            return
+        }
+        guard !pendingPitchCommand else {
+            completion(.failure(AdapterError.busy))
+            return
+        }
+        pendingPitchCommand = true
+        let bounded = max(-85, min(0, pitch))
+        let rotation = DJIGimbalRotation.gimbalRotation(
+            withPitchValue: NSNumber(value: bounded), rollValue: nil, yawValue: nil,
+            time: 0.2, mode: .absoluteAngle, ignore: false)
+        gimbal.rotate(with: rotation) { [weak self] error in
+            Task { @MainActor [weak self] in
+                self?.pendingPitchCommand = false
+                if let error = error {
+                    completion(.failure(error))
+                    self?.onStatus?("Gimbal command rejected: \(error.localizedDescription)")
+                } else {
+                    completion(.success(()))
+                }
+            }
+        }
+    }
+
+    private func refreshTelemetry() {
+        let connected = (DJISDKManager.product() as? DJIAircraft)?.isConnected ?? false
+        guard connected != snapshot.connected else { return }
+        snapshot.connected = connected
+        onSnapshot?(snapshot)
+        // Never mark stale telemetry as fresh merely because a connection was polled.
+    }
+}
+
+extension DJIAdapter: DJISDKManagerDelegate {
+    nonisolated func appRegisteredWithError(_ error: Error?) {
+        Task { @MainActor [weak self] in
+            guard let self = self else { return }
+            if let error = error {
+                self.onStatus?("DJI registration failed: \(error.localizedDescription)")
+            } else {
+                self.onStatus?("DJI registered. Waiting for remote controller.")
+                DJISDKManager.startConnectionToProduct()
+            }
+        }
+    }
+
+    nonisolated func productConnected(_ product: DJIBaseProduct?) {
+        Task { @MainActor [weak self] in
+            guard let self = self else { return }
+            guard let aircraft = product as? DJIAircraft else {
+                self.onStatus?("Connected device is not a DJI aircraft.")
+                return
+            }
+            self.snapshot.connected = true
+            self.onSnapshot?(self.snapshot)
+            self.onStatus?("Aircraft connected. Confirm model, gimbal capability and firmware.")
+            aircraft.flightController?.delegate = self
+            aircraft.gimbal?.delegate = self
+            aircraft.battery?.delegate = self
+            self.pollTimer?.invalidate()
+            self.pollTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
+                MainActor.assumeIsolated { self?.refreshTelemetry() }
+            }
+        }
+    }
+
+    nonisolated func productDisconnected() {
+        Task { @MainActor [weak self] in
+            self?.disconnect()
+            self?.onStatus?("Aircraft disconnected. Gimbal commands inhibited.")
+        }
+    }
+}
+
+extension DJIAdapter: DJIFlightControllerDelegate {
+    nonisolated func flightController(_ fc: DJIFlightController, didUpdate state: DJIFlightControllerState) {
+        let location = state.aircraftLocation
+        let coordinate = location?.coordinate
+        let locationSample = coordinate.map { GeoPoint(latitude: $0.latitude, longitude: $0.longitude) }
+        let altitude = state.altitude
+        let heading = Double(state.attitude.yaw)
+        let flying = state.isFlying
+        Task { @MainActor [weak self] in
+            guard let self = self else { return }
+            self.snapshot.uptime = ProcessInfo.processInfo.systemUptime
+            self.snapshot.position = locationSample?.isValid == true ? locationSample : nil
+            self.snapshot.altitudeMeters = altitude.isFinite ? Double(altitude) : nil
+            self.snapshot.headingDegrees = heading.isFinite ? Angle.compassDegrees(heading) : nil
+            self.snapshot.flying = flying
+            self.onSnapshot?(self.snapshot)
+        }
+    }
+}
+
+extension DJIAdapter: DJIGimbalDelegate {
+    nonisolated func gimbal(_ gimbal: DJIGimbal, didUpdate state: DJIGimbalState) {
+        let pitch = Double(state.attitudeInDegrees.pitch)
+        Task { @MainActor [weak self] in
+            self?.snapshot.gimbalPitchDegrees = pitch.isFinite ? pitch : nil
+        }
+    }
+}
+
+extension DJIAdapter: DJIBatteryDelegate {
+    nonisolated func battery(_ battery: DJIBattery, didUpdate state: DJIBatteryState) {
+        let percent = Int(state.chargeRemainingInPercent)
+        Task { @MainActor [weak self] in
+            self?.snapshot.batteryPercent = (0...100).contains(percent) ? percent : nil
+        }
+    }
+}
+#endif

@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "aerospatial-tools"
+version = "0.3.0"
+description = "Offline AeroSpatial session integrity, simulation, and analysis"
+requires-python = ">=3.10"
+authors = [{name = "AeroSpatial Contributors"}]
+license = {text = "MIT"}
+dependencies = []
+
+[project.scripts]
+aerospatial = "aerospatial_tools.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["aerospatial_tools*"]

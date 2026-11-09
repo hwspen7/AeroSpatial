@@ -1,0 +1,3 @@
+{"fields":{"pitch":-25},"kind":"calibration","note":"simulated sample","source":"app","uptime":12345,"wallTime":"2026-11-09T00:00:00Z"}
+{"fields":{"pitch":0,"yaw":0,"roll":0},"kind":"head","source":"airpods","uptime":12345.1,"wallTime":"2026-11-09T00:00:00Z"}
+{"fields":{"gimbal_pitch":-25,"battery_percent":87},"kind":"telemetry","source":"simulator","uptime":12345.2,"wallTime":"2026-11-09T00:00:00Z"}
