@@ -4,7 +4,7 @@ cmake -S Kernel -B build-native
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 cmake --build build-native --config Release --parallel
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-ctest --test-dir build-native --config Release --output-on-failure
+ctest --test-dir build-native -C Release --output-on-failure
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 $env:PYTHONPATH = 'Toolkit'
 $env:AEROSPATIAL_NATIVE_PROBE = (Resolve-Path 'build-native/Release/aerospatial-native-probe.exe').Path
