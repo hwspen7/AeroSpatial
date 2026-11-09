@@ -99,6 +99,16 @@ Swift owns device control and consent. C++ owns deterministic numerical operatio
 | Frame-level perception evidence | Normalized camera-image bounding boxes, confidence and model provenance in a separate SQLite schema | Offline metadata only; **no video ingestion or detector is claimed** |
 | Offline quality and privacy | Declarative quality gates, semantic audit rules, seeded corruption injection, SHA-256 manifests and privacy-reduced exports | Python tests and CLI acceptance; the digest is not a digital signature |
 
+### Validated session archive and initial model target
+
+The app now uses bounded, CRC-protected segmented recording as its source of truth,
+with a validated JSONL export after recording stops. It can recover an incomplete
+final record after restart, but rejects checksum damage or corruption in a prior
+segment. The generic core is aircraft-agnostic; the experimental DJI adapter
+currently targets **Mavic Air 2**, not **DJI Air 2S**. Device compatibility, video
+ingress and gimbal behavior still require real hardware verification. See
+[the P0 acceptance document](Docs/RUNTIME_FOUNDATION.md).
+
 ### Deliberately not claimed
 
 AeroSpatial does **not** currently implement live drone video decoding, visual object recognition, SLAM, HRTF 3D audio, autonomous navigation, aircraft yaw/roll control, or any flight mission. Those require independent hardware and algorithm acceptance gates. Current “head-relative audio” is a calculated **stereo pan / spoken-direction preview**; AirPods head motion is not eye tracking or a true-north heading sensor.

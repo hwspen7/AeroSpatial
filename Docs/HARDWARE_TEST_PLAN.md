@@ -8,6 +8,7 @@
 - [ ] Generate the Xcode project and compile the **simulation-only** iOS app successfully.
 - [ ] Install `DJI-SDK-iOS` 4.16.2 with CocoaPods and open the workspace.
 - [ ] Confirm DJI Swift module compilation, app registration, exact bundle ID and App Key.
+- [ ] Confirm SDK reports exactly `Mavic Air 2`. An Air 2S, Mavic Air or unknown model must fail closed in the initial adapter.
 - [ ] Confirm signed physical-iPhone launch; no simulator is claimed as live hardware testing.
 
 ## Gate B — passive hardware telemetry

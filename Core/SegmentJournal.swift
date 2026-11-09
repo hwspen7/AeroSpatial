@@ -4,7 +4,7 @@ import Foundation
 /// Append-only CRC-protected storage. Rotation is bounded and never deletes logs.
 /// Storage is separate from aircraft command authorization.
 public actor SegmentJournal {
-    public enum Failure: Error { case invalidLimits, limitReached, invalidRecord }
+    public enum Failure: Error { case invalidLimits, limitReached, invalidRecord, writeFailed }
 
     private let directory: URL
     private let segmentBytes: Int
@@ -12,6 +12,7 @@ public actor SegmentJournal {
     private var currentID: Int = 0
     private var currentBytes: Int = 0
     private var count: Int = 0
+    private var poisoned = false
 
     public init(directory: URL, segmentBytes: Int = 4 * 1024 * 1024,
                 maximumSegments: Int = 16) throws {
@@ -30,7 +31,9 @@ public actor SegmentJournal {
         for (index, name) in names.enumerated() {
             guard name == String(format: "segment-%08d.bin", index) else { throw Failure.invalidRecord }
             let path = directory.appendingPathComponent(name)
-            let recovered = try SegmentRecovery.repair(path, maximumBytes: segmentBytes)
+            let recovered = try (index == names.count - 1
+                ? SegmentRecovery.repair(path, maximumBytes: segmentBytes)
+                : SegmentRecovery.validate(path, maximumBytes: segmentBytes))
             currentBytes = recovered
             count += 1
             currentID = Int(name.dropFirst(8).prefix(8)) ?? 0
@@ -38,6 +41,7 @@ public actor SegmentJournal {
     }
 
     public func append(_ data: Data) throws {
+        guard !poisoned else { throw Failure.writeFailed }
         guard !data.isEmpty, data.count <= min(8 * 1024 * 1024, segmentBytes - 8) else {
             throw Failure.invalidRecord
         }
@@ -59,9 +63,14 @@ public actor SegmentJournal {
         for value in [UInt32(data.count), crc] {
             for offset in [0, 8, 16, 24] { header.append(UInt8(truncatingIfNeeded: value >> offset)) }
         }
-        try handle.write(contentsOf: header)
-        try handle.write(contentsOf: data)
-        try handle.synchronize()
+        do {
+            try handle.write(contentsOf: header)
+            try handle.write(contentsOf: data)
+            try handle.synchronize()
+        } catch {
+            poisoned = true
+            throw error
+        }
         currentID = nextID
         count = nextCount
         currentBytes = (rotate ? 0 : currentBytes) + data.count + 8

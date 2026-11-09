@@ -19,7 +19,7 @@ The source is a **portable software foundation**, not an aircraft-certified flig
 | P1 realistic workloads | Payload- and subscriber-configurable native benchmarks, CI smoke gate | Portable verified; device measurements pending |
 | P1 video stream | `EncodedFrame`/`VideoIngress`, codec and clock-domain validation, bounded C++ video topic | Synthetic encoded frames verified; DJI decoded/encoded video ingress pending |
 | P2 Swift payload serialization | Compact 44-byte CRC-checked native head record with Python parity, legacy JSON preserved | Portable verified; mobile throughput profiling pending |
-| P2 segmented durable recording | Native-backed Swift segment writer and Python reader/recovery; CRC, rotation and capacity tests | Library verified; existing UI JSONL recorder not migrated |
+| P2 segmented durable recording | Native-backed Swift segment writer and Python reader/recovery; CRC, rotation and capacity tests | CRC-framed archive is now authoritative for app recording; export tested; device recovery pending |
 | P2 spatial memory association | Source-checked observation/frame matching with timestamp uncertainty | Offline verified; real video/map localization pending |
 | P2 physical AirPods and aircraft | Hardware checklist in `HARDWARE_TEST_PLAN.md` | **Not tested; iPhone, Mac and actual aircraft required** |
 | P2 directory depth | Source directories kept shallow; only required C header/Python package nesting | Verified |

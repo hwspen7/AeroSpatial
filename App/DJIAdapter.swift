@@ -95,9 +95,16 @@ extension DJIAdapter: DJISDKManagerDelegate {
                 self.onStatus?("Connected device is not a DJI aircraft.")
                 return
             }
+            let model = aircraft.model
+            guard AircraftProfile.identify(model).isInitialBenchTarget else {
+                self.snapshot.connected = false
+                self.onSnapshot?(self.snapshot)
+                self.onStatus?("Aircraft model is not the validated Mavic Air 2 adapter target. Telemetry and commands disabled until an explicit driver is added.")
+                return
+            }
             self.snapshot.connected = true
             self.onSnapshot?(self.snapshot)
-            self.onStatus?("Aircraft connected. Confirm model, gimbal capability and firmware.")
+            self.onStatus?("Mavic Air 2 detected. SDK, firmware and gimbal remain unverified until physical bench acceptance.")
             aircraft.flightController?.delegate = self
             aircraft.gimbal?.delegate = self
             aircraft.battery?.delegate = self

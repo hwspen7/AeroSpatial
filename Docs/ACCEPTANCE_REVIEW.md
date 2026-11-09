@@ -23,7 +23,7 @@ algorithm-platform tracks have different scopes and are recorded separately.
 | P1 | Workload-sensitive benchmarks | Tested | Real video and thermals |
 | P1 | Live video | Offline decoder tested | DJI MSDK video callback, pixel buffers and device test |
 | P2 | Swift high-rate copy overhead | C++ fast path implemented | CVPixelBuffer zero-copy and Instruments |
-| P2 | Persistent segments and recovery | Portable tested | Retention lifecycle in live app |
+| P2 | Persistent segments and recovery | CRC-framed app writer + verified JSONL export tested on Linux | Retention lifecycle and device recovery drill |
 | P2 | Visual memory | Image-level offline matching tested | Real camera calibration and geo-relocalization |
 | P2 | AirPods and DJI compatibility | Not tested | Physical iPhone, headphones, controller, aircraft |
 | P2 | Shallow directory conventions | Tested by repository layout | Maintain in reviews |
