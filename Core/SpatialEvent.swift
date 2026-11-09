@@ -1,7 +1,7 @@
 import Foundation
 
 /// Identifiers are shared with Kernel/include/aerospatial_bus.h.
-public enum SpatialStream: UInt32, CaseIterable, Sendable {
+public enum SpatialStream: UInt32, CaseIterable, Codable, Sendable {
     case head = 1
     case telemetry = 2
     case video = 3

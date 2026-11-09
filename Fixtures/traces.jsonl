@@ -1,0 +1,3 @@
+{"traceId":9,"spanId":1,"parentId":null,"clockDomain":1,"startNs":1000,"endNs":4000,"name":"frame_ingress","outcome":"ok"}
+{"traceId":9,"spanId":2,"parentId":1,"clockDomain":1,"startNs":1700,"endNs":3000,"name":"frame_decode","outcome":"ok"}
+{"traceId":9,"spanId":3,"parentId":2,"clockDomain":1,"startNs":2400,"endNs":2800,"name":"object_detect","outcome":"skipped"}

@@ -33,6 +33,19 @@ Python can audit portable metadata envelopes without loading video payloads.
 This is a **tested transport foundation**, not a live DJI video decoder or
 flight control mechanism. See [bus engineering contract](Docs/MULTIMODAL_BUS.md).
 
+
+## Algorithm development foundation
+
+The optional-compute layer now includes a bounded **C++ admission governor**, pinhole camera rays and reference-plane geometry, deterministic Swift/Python algorithm dependency manifests, explicit device-capability checks, an offline Python execution harness, causal-span tracing, immutable optical calibration metadata, and synchronized head/video/telemetry metadata bundles.
+
+All optional algorithms are prohibited from publishing head or aircraft telemetry source streams. Neither the compute governor nor the plugin runtime authorizes flight control. Real DJI video, inference and device calibration remain unverified. Read [the algorithm contract](Docs/ALGORITHM_PLATFORM.md) and [development matrix](Docs/DEVELOPMENT_TRACKS.md).
+
+```bash
+PYTHONPATH=Toolkit python3 -m aerospatial_tools algorithms Fixtures/algorithms.json
+PYTHONPATH=Toolkit python3 -m aerospatial_tools trace-audit Fixtures/traces.jsonl
+PYTHONPATH=Toolkit python3 -m aerospatial_tools workload --samples 3000 --seed 42
+```
+
 ## Architecture
 
 ```mermaid

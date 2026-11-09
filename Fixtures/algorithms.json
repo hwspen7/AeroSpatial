@@ -1,0 +1,22 @@
+[
+  {
+    "identifier": "object_detector",
+    "inputs": [3],
+    "outputs": [4],
+    "dependencies": [],
+    "memoryBudgetBytes": 67108864,
+    "deadlineMilliseconds": 120,
+    "deterministic": true,
+    "requiresHardware": false
+  },
+  {
+    "identifier": "place_indexer",
+    "inputs": [4],
+    "outputs": [5],
+    "dependencies": ["object_detector"],
+    "memoryBudgetBytes": 16777216,
+    "deadlineMilliseconds": 250,
+    "deterministic": true,
+    "requiresHardware": false
+  }
+]

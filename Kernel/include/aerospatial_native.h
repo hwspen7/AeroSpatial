@@ -3,6 +3,7 @@
 
 #include <stddef.h>
 #include "aerospatial_wire.h"
+#include "aerospatial_qos.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -59,6 +60,22 @@ ASStatus as_wgs84_ecef_batch(const ASGeodetic3 *points, size_t count, ASVector3 
 /* In-place supported. Validates all samples before mutation. */
 ASStatus as_lowpass_batch(const double *measurements, size_t count,
                           double alpha, double initial, double *result);
+/* Pinhole camera coordinates: +X image right, +Y image down, +Z forward.
+   Intrinsics must correspond to the encoded/decoded frame size and crop. */
+typedef struct {
+    double fx, fy, cx, cy;
+    uint32_t width, height;
+} ASCameraIntrinsics;
+/* Returns a unit camera-frame ray (not a depth estimate). */
+ASStatus as_camera_unproject(ASCameraIntrinsics camera, double pixel_x,
+                             double pixel_y, ASVector3 *unit_ray);
+/* Plane and camera position share the same local ENU origin and height datum.
+   camera_to_enu transforms optical camera frame into ENU.
+   Intersects only positive rays within max_distance_m. Not terrain mapping. */
+ASStatus as_camera_ground_intersection(ASCameraIntrinsics camera, double pixel_x,
+                                       double pixel_y, ASVector3 camera_enu,
+                                       ASQuaternion camera_to_enu, double plane_up_m,
+                                       double max_distance_m, ASVector3 *result);
 /* Simple left/right stereo balance only; NOT HRTF spatial sound. */
 ASStatus as_stereo_pan(double relative_bearing_deg, double *pan_out);
 

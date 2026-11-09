@@ -53,6 +53,7 @@ jobs:
           PYTHONPATH: Toolkit
           AEROSPATIAL_NATIVE_PROBE: ${{ github.workspace }}/build-native/aerospatial-native-probe
           AEROSPATIAL_WIRE_PROBE: ${{ github.workspace }}/build-native/aerospatial-wire-probe
+          AEROSPATIAL_QOS_PROBE: ${{ github.workspace }}/build-native/aerospatial-qos-probe
         run: python -m unittest discover -s ToolkitTests -v
       - name: Python stream benchmark smoke test
         env:
@@ -71,6 +72,9 @@ jobs:
           python -m aerospatial_tools sanitize "$RUNNER_TEMP/aerospatial.jsonl" "$RUNNER_TEMP/public.jsonl"
           python -m aerospatial_tools validate "$RUNNER_TEMP/public.jsonl"
           python -m aerospatial_tools bus-audit Fixtures/multimodal.jsonl
+          python -m aerospatial_tools algorithms Fixtures/algorithms.json
+          python -m aerospatial_tools trace-audit Fixtures/traces.jsonl
+          python -m aerospatial_tools workload --samples 1000 --seed 42
           python -m aerospatial_tools digest create "$RUNNER_TEMP/public.jsonl" "$RUNNER_TEMP/digest.json"
           python -m aerospatial_tools digest verify "$RUNNER_TEMP/public.jsonl" "$RUNNER_TEMP/digest.json"
 

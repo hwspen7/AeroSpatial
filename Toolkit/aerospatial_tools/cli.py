@@ -16,6 +16,9 @@ from .simulation import generate
 from .validation import validate
 from .bus_events import InvalidBusEvent, read_bus_envelopes
 from .bus_audit import BusAudit
+from .algorithm import load_manifests
+from .workload import WorkloadProfile, replay as workload_replay
+from .trace_protocol import inspect_trace
 from .events import InvalidSession
 from .memory_storage import SpatialMemory
 from .memory_models import Observation
@@ -61,12 +64,26 @@ def main(argv: list[str] | None = None) -> int:
     memory.add_argument("--session", type=Path)
     bus_cmd = commands.add_parser("bus-audit", help="Audit timestamped multimodal bus envelopes")
     bus_cmd.add_argument("path", type=Path)
+    algorithm_cmd = commands.add_parser("algorithms", help="Validate and plan algorithm manifests")
+    algorithm_cmd.add_argument("manifest", type=Path)
+    trace_cmd = commands.add_parser("trace-audit", help="Audit causal algorithm spans")
+    trace_cmd.add_argument("path", type=Path)
+    workload_cmd = commands.add_parser("workload", help="Reproducible optional-compute overload experiment")
+    workload_cmd.add_argument("--samples", type=int, default=3000)
+    workload_cmd.add_argument("--seed", type=int, default=7)
     bench = commands.add_parser("benchmark", help="Measure offline streaming throughput")
     bench.add_argument("--count", type=int, default=100000)
     bench.add_argument("--iterations", type=int, default=5)
     args = parser.parse_args(argv)
     try:
-        if args.command == "bus-audit":
+        if args.command == "algorithms":
+            result = {"executionOrder": [item.identifier for item in load_manifests(args.manifest).ordered()]}
+            status = 0
+        elif args.command == "trace-audit":
+            result, status = inspect_trace(args.path), 0
+        elif args.command == "workload":
+            result, status = workload_replay(WorkloadProfile(seed=args.seed, samples=args.samples)), 0
+        elif args.command == "bus-audit":
             bus_audit = BusAudit()
             for envelope in read_bus_envelopes(args.path):
                 bus_audit.inspect(envelope)
