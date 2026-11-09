@@ -36,7 +36,6 @@ jobs:
           for p in parts:
               p.unlink()
           folder.rmdir()
-          pathlib.Path('.github/workflows/unpack-foundation.yml').unlink()
           print('Source tree reconstructed.')
           PY
       - name: Commit expanded tree
