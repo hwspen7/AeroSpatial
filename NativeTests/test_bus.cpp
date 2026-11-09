@@ -111,7 +111,7 @@ static void lifecycle_and_limits() {
     int value = 0;
     size_t length = 0;
     uint64_t missed = 0;
-    REQUIRE(as_bus_poll(reader, &value, sizeof(value), &out, &length, &missed) == ASBUS_EMPTY);
+    REQUIRE(as_bus_poll(reader, &value, sizeof(value), &out, &length, &missed) == ASBUS_CLOSED);
     as_bus_unsubscribe(reader);
 }
 

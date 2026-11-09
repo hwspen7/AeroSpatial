@@ -250,3 +250,17 @@ PYTHONPATH=Toolkit python3 -m aerospatial_tools benchmark --count 100000 --itera
 ```
 
 See [performance contract and measurement methodology](Docs/PERFORMANCE.md).
+
+## Foundation reliability audit
+
+The native bus now supports a global payload budget (including lease-held data),
+cached publisher handles, explicit shutdown semantics, and concurrent budget
+regression tests. The metadata-only Swift timeline enforces explicit clock
+normalization with uncertainty-aware alignment. Offline stream audits distinguish
+initial subscriber gaps from later transport gaps. See
+[Engineering audit](Docs/ENGINEERING_AUDIT.md) for resolved and outstanding risks.
+
+UI source files live directly under `App/`. Native public headers remain under
+`Kernel/include/` because Swift Package Manager requires that public header path.
+The Python package remains under `Toolkit/aerospatial_tools/` for importability.
+Neither the bus nor the timeline issues flight commands. Hardware validation is pending.

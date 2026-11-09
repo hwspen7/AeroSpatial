@@ -22,7 +22,19 @@ extern "C" ASBus *as_bus_create(const ASBusConfig *config) {
     try { return new ASBus(*config); } catch (...) { return nullptr; }
 }
 
-extern "C" void as_bus_destroy(ASBus *bus) { delete bus; }
+extern "C" void as_bus_destroy(ASBus *bus) {
+    if (!bus) return;
+    // Subscribers and fast publishers keep each topic alive after parent destruction.
+    // This operation must not race with methods using the raw parent bus pointer.
+    {
+        std::lock_guard<std::mutex> lock(bus->mutex);
+        for (auto &entry : bus->topics) {
+            std::lock_guard<std::mutex> topic_lock(entry.second->mutex);
+            entry.second->closed = true;
+        }
+    }
+    delete bus;
+}
 
 extern "C" ASBusStatus as_bus_add_topic(ASBus *bus, ASBusTopicConfig config) {
     if (!bus || !config.stream_id || !config.capacity || config.capacity > 4096 ||
@@ -34,7 +46,7 @@ extern "C" ASBusStatus as_bus_add_topic(ASBus *bus, ASBusTopicConfig config) {
     if (bus->topics.size() == bus->config.max_topics) return ASBUS_LIMIT_REACHED;
     try {
         bus->topics.emplace(config.stream_id,
-                            std::make_shared<BusTopic>(config, bus->config.max_subscribers_per_topic));
+                            std::make_shared<BusTopic>(config, bus->config.max_subscribers_per_topic, bus->budget));
         return ASBUS_OK;
     } catch (...) { return ASBUS_LIMIT_REACHED; }
 }
@@ -42,8 +54,14 @@ extern "C" ASBusStatus as_bus_add_topic(ASBus *bus, ASBusTopicConfig config) {
 extern "C" ASBusStatus as_bus_publish(ASBus *bus, ASBusHeader header,
                                        const void *payload, size_t payload_bytes) {
     auto topic = find_topic(bus, header.stream_id);
+    return bus_publish_topic(topic, header, payload, payload_bytes);
+}
+
+ASBusStatus bus_publish_topic(const std::shared_ptr<BusTopic> &topic, ASBusHeader header,
+                              const void *payload, size_t payload_bytes) {
     if (!topic) return ASBUS_INVALID;
     std::lock_guard<std::mutex> lock(topic->mutex);
+    if (topic->closed) return ASBUS_CLOSED;
     if (header.sequence || !header.clock_domain ||
         !(header.quality_flags & ASBUS_QUALITY_VALID) ||
         (header.quality_flags & ~kKnownQuality) ||
@@ -69,8 +87,22 @@ extern "C" ASBusStatus as_bus_publish(ASBus *bus, ASBusHeader header,
         ++topic->stats.rejected;
         return ASBUS_LIMIT_REACHED;
     }
+    // Include payloads retained by external leases in the global accounting.
+    // Reserve before allocating and roll back on allocation failure.
+    if (!topic->budget->reserve(payload_bytes)) {
+        ++topic->stats.rejected;
+        ++topic->stats.budget_rejected;
+        return ASBUS_MEMORY_BUDGET;
+    }
+    struct Reservation {
+        BusBudget &budget;
+        uint64_t bytes;
+        ~Reservation() { budget.release(bytes); }
+    } reservation{*topic->budget, static_cast<uint64_t>(payload_bytes)};
     try {
         auto event = std::make_shared<BusEvent>();
+        event->budget = topic->budget;
+        event->reserved_bytes = 0;
         header.sequence = topic->next;
         event->header = header;
         if (payload_bytes) {
@@ -83,8 +115,13 @@ extern "C" ASBusStatus as_bus_publish(ASBus *bus, ASBusHeader header,
             ++topic->oldest;
             ++topic->stats.overwritten;
         }
+        // Transfer accounting only after every potentially throwing allocation.
+        event->reserved_bytes = payload_bytes;
+        reservation.bytes = 0;
         topic->slots[bus_slot(*topic, topic->next)] = std::move(event);
     } catch (...) {
+        // The event's destructor releases the reservation once constructed.
+        // Allocation of BusEvent itself is handled by the guard below.
         ++topic->stats.rejected;
         return ASBUS_LIMIT_REACHED;
     }
@@ -100,6 +137,40 @@ extern "C" ASBusStatus as_bus_publish(ASBus *bus, ASBusHeader header,
     topic->has_timestamp = true;
     return ASBUS_OK;
 }
+
+extern "C" ASBusStatus as_bus_set_payload_budget(ASBus *bus, uint64_t bytes) {
+    if (!bus || !bytes || bytes > (1ull << 34)) return ASBUS_INVALID;
+    std::lock_guard<std::mutex> lock(bus->mutex);
+    // Configure before adding topics; no producer can race with configuration.
+    if (!bus->topics.empty()) return ASBUS_BUSY;
+    bus->budget->limit.store(bytes, std::memory_order_release);
+    return ASBUS_OK;
+}
+
+extern "C" ASBusStatus as_bus_memory_stats(ASBus *bus, ASBusMemoryStats *stats) {
+    if (!bus || !stats) return ASBUS_INVALID;
+    std::lock_guard<std::mutex> lock(bus->mutex);
+    stats->limit_bytes = bus->budget->limit.load(std::memory_order_acquire);
+    stats->live_bytes = bus->budget->live.load(std::memory_order_acquire);
+    stats->high_water_bytes = bus->budget->peak.load(std::memory_order_acquire);
+    return ASBUS_OK;
+}
+
+extern "C" ASBusPublisher *as_bus_open_publisher(ASBus *bus, uint32_t stream_id) {
+    auto topic = find_topic(bus, stream_id);
+    if (!topic) return nullptr;
+    std::lock_guard<std::mutex> lock(topic->mutex);
+    if (topic->closed) return nullptr;
+    return new (std::nothrow) ASBusPublisher{std::move(topic)};
+}
+
+extern "C" ASBusStatus as_bus_publish_fast(ASBusPublisher *publisher, ASBusHeader header,
+                                             const void *payload, size_t payload_bytes) {
+    if (!publisher || header.stream_id != publisher->topic->config.stream_id) return ASBUS_INVALID;
+    return bus_publish_topic(publisher->topic, header, payload, payload_bytes);
+}
+
+extern "C" void as_bus_close_publisher(ASBusPublisher *publisher) { delete publisher; }
 
 extern "C" ASBusStatus as_bus_stats(ASBus *bus, uint32_t stream_id,
                                     ASBusTopicStats *stats) {

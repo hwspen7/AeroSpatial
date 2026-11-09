@@ -13,6 +13,7 @@ extern "C" {
 typedef struct ASBus ASBus;
 typedef struct ASBusSubscription ASBusSubscription;
 typedef struct ASBusLease ASBusLease;
+typedef struct ASBusPublisher ASBusPublisher;
 
 typedef enum {
     ASBUS_OK = 0,
@@ -23,7 +24,9 @@ typedef enum {
     ASBUS_BUFFER_TOO_SMALL = 5,
     ASBUS_TIME_REGRESSION = 6,
     ASBUS_BUSY = 7,
-    ASBUS_LIMIT_REACHED = 8
+    ASBUS_LIMIT_REACHED = 8,
+    ASBUS_CLOSED = 9,
+    ASBUS_MEMORY_BUDGET = 10
 } ASBusStatus;
 
 typedef enum {
@@ -77,13 +80,33 @@ typedef struct {
     uint64_t next_sequence;
     uint32_t retained_events;
     uint32_t active_subscribers;
+    uint64_t budget_rejected;
 } ASBusTopicStats;
 
+typedef struct {
+    uint64_t limit_bytes;        /* Retained and leased payload bytes, not allocator overhead */
+    uint64_t live_bytes;
+    uint64_t high_water_bytes;
+} ASBusMemoryStats;
+
 /* Opaque handles. Subscribers may outlive the parent bus, and drain retained events.
-   Destroying the same handle concurrently with its use is not supported. */
+   Destroying the same handle concurrently with its use is not supported.
+   Once drained, subscriptions return ASBUS_CLOSED after parent destruction. */
 ASBus *as_bus_create(const ASBusConfig *config);
 void as_bus_destroy(ASBus *bus);
 ASBusStatus as_bus_add_topic(ASBus *bus, ASBusTopicConfig config);
+/* Sets a global payload budget before adding topics. */
+ASBusStatus as_bus_set_payload_budget(ASBus *bus, uint64_t bytes);
+ASBusStatus as_bus_memory_stats(ASBus *bus, ASBusMemoryStats *stats);
+
+/* A publisher handle avoids repeated global topic-table locks in the hot path.
+   It is safe to publish concurrently on distinct threads through the same handle.
+   After as_bus_destroy, it returns ASBUS_CLOSED instead of accessing freed memory.
+   Do not close a publisher handle concurrently with a publish through that handle. */
+ASBusPublisher *as_bus_open_publisher(ASBus *bus, uint32_t stream_id);
+ASBusStatus as_bus_publish_fast(ASBusPublisher *publisher, ASBusHeader header,
+                                const void *payload, size_t payload_bytes);
+void as_bus_close_publisher(ASBusPublisher *publisher);
 ASBusStatus as_bus_publish(ASBus *bus, ASBusHeader header,
                            const void *payload, size_t payload_bytes);
 ASBusStatus as_bus_stats(ASBus *bus, uint32_t stream_id, ASBusTopicStats *stats);

@@ -21,7 +21,7 @@ On Windows, run `Scripts/Run-Checks.ps1` for C++ and Python. Native iOS builds a
 - Each module should have a single reason to change. Aim for **fewer than 200 lines per source file**, extracting extensions, adapters, structs and independent tests instead of building monoliths.
 - Source and code comments use English. Prefer precise physical units in names and API contracts.
 - C++ module public functions are exported through `aerospatial_native.h` as a stable C ABI. Do not expose STL types, exceptions, raw pointers to owned memory or hardware dependencies across the Swift boundary.
-- Avoid app-framework imports in the portable `AeroSpatialCore` target. SwiftUI, CoreMotion, CoreLocation and DJI APIs belong under `App/Services` or `App/Views`.
+- Avoid app-framework imports in the portable `AeroSpatialCore` target. SwiftUI, CoreMotion, CoreLocation and DJI APIs belong under `App` or `App`.
 - Python may consume recording files, but must not become a dependency of the on-device control loop.
 - A new device adapter must declare capabilities, timestamp provenance, simulator support and specific fail-closed behavior.
 - Each new numerical operation needs a native test, a Swift integration test, and a Python parity case when cross-language behavior matters.

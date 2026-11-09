@@ -81,3 +81,44 @@ PYTHONPATH=Toolkit python3 -m aerospatial_tools bus-audit Fixtures/multimodal.js
 - Producer-side backpressure response must be explicitly implemented by each adapter.
 - Future live video integration requires captured buffers, codec metadata,
   validated camera intrinsics, and an independent iOS hardware test.
+
+## Global resource governance and lifecycle
+
+`as_bus_set_payload_budget` configures one aggregate payload-byte cap across all
+streams, **before** topics are added. `as_bus_memory_stats` reports current and
+peak live payload bytes, including data kept alive by native subscriber leases.
+It does not measure shared-pointer or container allocator overhead. The default
+native budget is 256 MiB; the Swift application configures 64 MiB. Configure
+headroom for at least one new event in addition to the retained ring contents:
+an overwrite attempts to allocate the replacement before evicting an old slot.
+If budget reservation fails, the existing retained event is not destroyed and
+the publisher receives `ASBUS_MEMORY_BUDGET`.
+
+`as_bus_open_publisher` returns a stable topic handle. Use `as_bus_publish_fast`
+on high-frequency paths to avoid repeatedly locking the global topic table.
+`as_bus_close_publisher` releases it. Multiple producer threads may publish
+through one open handle. Do not concurrently free a handle while publishing.
+Destroying a parent bus closes topics, while subscribers can drain retained
+messages and publisher handles subsequently return `ASBUS_CLOSED`.
+
+## Explicit time-alignment layer
+
+`MultimodalTimeline` is a bounded Swift metadata-only nearest-neighbor matcher.
+Callers must supply normalized nanosecond timestamps, uncertainty and original
+clock domains when constructing `TimelinePoint`. Matching requires both a
+configured maximum clock uncertainty and `abs(skew) + uncertainty <= tolerance`.
+Stale samples are rejected. No payload duplication, interpolation, automatic
+clock conversion, video decoding or flight actuation happens in this layer.
+
+## Performance method
+
+The bus microbenchmark supports `count`, `payload_bytes`, `reader_count`, and
+`fast|indexed` arguments. Compare results on the same host with the same build
+flags and inputs. A high event rate for 8-byte payloads is not evidence of
+low latency with video frames or an iOS device.
+
+```sh
+./build-native/aerospatial-bus-bench 150000 8 0 fast
+./build-native/aerospatial-bus-bench 150000 8 0 indexed
+./build-native/aerospatial-bus-bench 150000 1024 4 fast
+```

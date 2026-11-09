@@ -1,5 +1,6 @@
 #include "bus_internal.hpp"
 #include <cstring>
+#include <memory>
 #include <new>
 
 void bus_trim_consumed(BusTopic &topic) {
@@ -56,10 +57,10 @@ extern "C" ASBusSubscription *as_bus_subscribe(ASBus *bus, uint32_t stream_id,
     try {
         auto cursor = std::make_shared<BusCursor>();
         cursor->next = start_latest ? topic->next : topic->oldest;
-        auto *subscription = new ASBusSubscription{topic, cursor};
+        auto subscription = std::unique_ptr<ASBusSubscription>(new ASBusSubscription{topic, cursor});
         topic->cursors.push_back(cursor);
         topic->stats.active_subscribers = static_cast<uint32_t>(topic->cursors.size());
-        return subscription;
+        return subscription.release();
     } catch (...) { return nullptr; }
 }
 
@@ -86,7 +87,7 @@ extern "C" ASBusStatus as_bus_poll(ASBusSubscription *subscription, void *buffer
     if (subscription->cursor->leased) return ASBUS_BUSY;
     uint64_t gap = 0;
     auto event = bus_next(*topic, *subscription->cursor, gap);
-    if (!event) return ASBUS_EMPTY;
+    if (!event) return topic->closed ? ASBUS_CLOSED : ASBUS_EMPTY;
     *bytes = event->payload.size();
     if (event->payload.size() > capacity) return ASBUS_BUFFER_TOO_SMALL;
     if (!event->payload.empty() && !buffer) return ASBUS_INVALID;

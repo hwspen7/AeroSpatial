@@ -5,10 +5,10 @@ AeroSpatial intentionally separates real-time device control, portable numerical
 ## Swift extension points
 
 - **New sensors:** Produce `HeadSample` or a dedicated typed sample with a monotonic timestamp and explicit coordinate-frame documentation. Use `SensorHealthMonitor` to reject invalid, future or repeated timestamps before `SensorSynchronizer`.
-- **New aircraft adapters:** Implement the app's `DroneAdapter` protocol under `App/Services`. Declare conservative `DeviceCapabilities`, never set `canCommandFlight`, and implement `disconnect()` plus explicit command callbacks. Live pitch is build-gated in `BenchSafety` and separately restricted by `GimbalCommandGate`.
+- **New aircraft adapters:** Implement the app's `DroneAdapter` protocol under `App`. Declare conservative `DeviceCapabilities`, never set `canCommandFlight`, and implement `disconnect()` plus explicit command callbacks. Live pitch is build-gated in `BenchSafety` and separately restricted by `GimbalCommandGate`.
 - **New spatial algorithms:** Build against `SpatialTransform`, `FrameGraph`, `NativeFrames`, `HeadRelativeAwareness` and explicit frame IDs. Do not conflate a relative DJI takeoff altitude with an ellipsoidal GPS height.
 - **New advisory rules:** Keep them pure and read-only like `PassiveAdvisor`. Distinguish measured telemetry from estimates and warn when supporting samples are stale.
-- **New UI:** Put screens in `App/Views` and subscriptions in application services, not inside portable mathematical code.
+- **New UI:** Put screens in `App` and subscriptions in application services, not inside portable mathematical code.
 
 ## C++ numerical extensions
 

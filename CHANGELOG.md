@@ -1,3 +1,11 @@
+## 2026-11-09 — Reliability and lifecycle hardening
+
+- Enforced aggregate native payload budget including leased events.
+- Added cached publisher handles, explicit close semantics and safe subscriber creation.
+- Added metadata-only normalized multimodal alignment with uncertainty constraints.
+- Improved streaming quality audit and configurable performance benchmarks.
+- Flattened app source directories and added a structured engineering risk register.
+
 ## Multimodal transport foundation
 
 - Added a C++17 per-stream bounded publish/subscribe bus with explicit backpressure,

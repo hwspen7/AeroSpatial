@@ -41,6 +41,13 @@ public struct SpatialStreamStats: Sendable, Equatable {
     public let highWaterBytes: UInt64
     public let retainedEvents: UInt32
     public let subscribers: UInt32
+    public let budgetRejected: UInt64
+}
+
+public struct SpatialMemoryStats: Sendable, Equatable {
+    public let limitBytes: UInt64
+    public let liveBytes: UInt64
+    public let highWaterBytes: UInt64
 }
 
 public enum SpatialBusError: Error, Equatable {

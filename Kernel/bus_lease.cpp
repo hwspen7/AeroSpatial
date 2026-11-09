@@ -9,7 +9,7 @@ extern "C" ASBusStatus as_bus_acquire(ASBusSubscription *subscription,
     if (subscription->cursor->leased) return ASBUS_BUSY;
     uint64_t gap = 0;
     auto event = bus_next(*topic, *subscription->cursor, gap);
-    if (!event) return ASBUS_EMPTY;
+    if (!event) return topic->closed ? ASBUS_CLOSED : ASBUS_EMPTY;
     auto *result = new (std::nothrow) ASBusLease{event, topic, subscription->cursor};
     if (!result) return ASBUS_LIMIT_REACHED;
     subscription->cursor->leased = true;
