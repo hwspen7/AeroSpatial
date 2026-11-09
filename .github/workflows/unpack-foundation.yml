@@ -18,7 +18,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: true
-      - name: Verify and expand signed-by-digest source snapshot
+      - name: Validate snapshot and extract sources
         shell: bash
         run: |
           python3 - <<'PY'
@@ -26,33 +26,30 @@ jobs:
           root = pathlib.Path("bootstrap")
           parts = sorted(root.glob("part-*.txt"))
           if len(parts) != 15:
-              print(f"Waiting for 15 archive chunks; found {len(parts)}.")
+              print(f"Waiting for 15 chunks; found {len(parts)}.")
               sys.exit(0)
-          encoded = base64.b64decode("".join(x.read_text().strip() for x in parts), validate=True)
-          actual = hashlib.sha256(encoded).hexdigest()
-          expected = "0adcf38986b5116dc185fd39610a95140399bb730c431aa7670570b3356ff632"
-          if actual != expected:
-              raise ValueError(f"Source digest mismatch: {actual}")
-          payload = lzma.decompress(encoded)
-          with tarfile.open(fileobj=io.BytesIO(payload), mode="r:") as source:
-              for entry in source.getmembers():
-                  path = pathlib.PurePosixPath(entry.name)
-                  if entry.issym() or entry.islnk() or entry.isdev() or path.is_absolute() or ".." in path.parts:
-                      raise ValueError("Unsafe archive entry")
-              source.extractall(".", filter="data")
-          for part in parts: part.unlink()
+          payload = base64.b64decode("".join(p.read_text().strip() for p in parts), validate=True)
+          digest = hashlib.sha256(payload).hexdigest()
+          assert digest == "0adcf38986b5116dc185fd39610a95140399bb730c431aa7670570b3356ff632", digest
+          tar = lzma.decompress(payload)
+          with tarfile.open(fileobj=io.BytesIO(tar), mode="r:") as tf:
+              for item in tf.getmembers():
+                  name = pathlib.PurePosixPath(item.name)
+                  if item.issym() or item.islnk() or item.isdev() or name.is_absolute() or ".." in name.parts:
+                      raise ValueError("Unsafe archive path")
+              tf.extractall(".", filter="data")
+          for part in root.iterdir(): part.unlink()
           root.rmdir()
-          pathlib.Path(".github/workflows/unpack-foundation.yml").unlink()
-          print("Verified snapshot expanded.")
+          print("SHA-256 verified, source extracted.")
           PY
-      - name: Commit published source
+      - name: Commit source without modifying workflow definitions
         shell: bash
         run: |
           if [ -d bootstrap ]; then exit 0; fi
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add -A
+          git add -A -- . ':!.github/workflows/**'
           if ! git diff --cached --quiet; then
-            git commit -m 'feat: publish streamlined high-performance AeroSpatial foundation'
+            git commit -m 'feat: publish streamlined high-performance AeroSpatial source'
             git push origin HEAD:main
           fi
