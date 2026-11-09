@@ -16,7 +16,7 @@ int main() {
     std::atomic<uint64_t> total_reads{0};
     std::atomic<uint64_t> last_seq{0};
     std::thread consumer([&] {
-        while (!finished.load(std::memory_order_acquire)) {
+        while (true) {
             uint64_t payload = 0, missed = 0;
             ASBusHeader hdr{};
             size_t bytes = 0;
@@ -26,7 +26,10 @@ int main() {
                 last_seq.store(hdr.sequence);
                 REQUIRE(bytes == 8);
                 ++total_reads;
-            } else REQUIRE(status == ASBUS_EMPTY);
+            } else {
+                REQUIRE(status == ASBUS_EMPTY);
+                if (finished.load(std::memory_order_acquire)) break;
+            }
             std::this_thread::yield();
         }
     });

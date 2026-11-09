@@ -78,7 +78,12 @@ class BusEnvelope:
 
 def read_bus_envelopes(path: Path) -> Iterator[BusEnvelope]:
     with path.open("rb") as file:
-        for line_number, line in enumerate(file, 1):
+        line_number = 0
+        while True:
+            line = file.readline(MAX_LINE + 1)
+            if not line:
+                break
+            line_number += 1
             if len(line) > MAX_LINE:
                 raise InvalidBusEvent(f"line {line_number}: too long")
             if not line.strip():

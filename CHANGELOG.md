@@ -1,3 +1,16 @@
+## Multimodal transport foundation
+
+- Added a C++17 per-stream bounded publish/subscribe bus with explicit backpressure,
+  source clock domains, quality flags, independent subscriber cursors and missed-event accounting.
+- Added shared payload leases for zero-copy native fan-out with bounded outstanding
+  leases and defensive validation at the C ABI boundary.
+- Added typed Swift ingress for accepted head motion and aircraft telemetry,
+  plus extension interfaces for encoded video and perception metadata.
+- Added streaming Python metadata audit, reproducible fixtures, native concurrency
+  tests, Linux sanitizer acceptance and a standalone transport microbenchmark.
+- Preserved the existing command authorization layer. This bus is not a flight
+  control system or live video decoding pipeline.
+
 # Changelog
 
 ## Current foundation upgrade

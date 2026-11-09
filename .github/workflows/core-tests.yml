@@ -40,6 +40,11 @@ jobs:
           cmake -S Kernel -B build-native -DCMAKE_BUILD_TYPE=Release
           cmake --build build-native --parallel 4
           ctest --test-dir build-native --output-on-failure
+      - name: Native multimodal bus throughput smoke test
+        run: |
+          cmake -S Kernel -B build-bus -DCMAKE_BUILD_TYPE=Release -DAEROSPATIAL_BUILD_BUS_BENCHMARK=ON
+          cmake --build build-bus --parallel 4
+          ./build-bus/aerospatial-bus-bench 100000
       - name: Unit and cross-language tests
         env:
           PYTHONPATH: Toolkit
@@ -61,6 +66,7 @@ jobs:
           python -m aerospatial_tools gate "$RUNNER_TEMP/aerospatial.jsonl" --profile Quality/simulator.json
           python -m aerospatial_tools sanitize "$RUNNER_TEMP/aerospatial.jsonl" "$RUNNER_TEMP/public.jsonl"
           python -m aerospatial_tools validate "$RUNNER_TEMP/public.jsonl"
+          python -m aerospatial_tools bus-audit Fixtures/multimodal.jsonl
           python -m aerospatial_tools digest create "$RUNNER_TEMP/public.jsonl" "$RUNNER_TEMP/digest.json"
           python -m aerospatial_tools digest verify "$RUNNER_TEMP/public.jsonl" "$RUNNER_TEMP/digest.json"
 
