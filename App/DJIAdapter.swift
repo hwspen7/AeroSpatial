@@ -29,16 +29,20 @@ final class DJIAdapter: NSObject, DroneAdapter {
 
     private func startVideoFeed() {
         guard let publisher = videoPublisher, videoReceiver == nil else { return }
+        guard let feed = DJISDKManager.videoFeeder()?.primaryVideoFeed else {
+            onStatus?("DJI primary video feed unavailable.")
+            return
+        }
         publisher.markDiscontinuity()
         let receiver = DJIEncodedVideoReceiver(publisher: publisher)
         videoReceiver = receiver
-        DJISDKManager.videoFeeder().primaryVideoFeed.add(receiver, with: videoCallbackQueue)
+        feed.add(receiver, with: videoCallbackQueue)
     }
 
     private func stopVideoFeed() {
         guard let receiver = videoReceiver else { return }
         receiver.deactivate()
-        DJISDKManager.videoFeeder().primaryVideoFeed.removeListener(receiver)
+        DJISDKManager.videoFeeder()?.primaryVideoFeed.removeListener(receiver)
         videoReceiver = nil
     }
 
@@ -85,8 +89,8 @@ final class DJIAdapter: NSObject, DroneAdapter {
         }
         pendingPitchCommand = true
         let bounded = max(-85, min(0, pitch))
-        let rotation = DJIGimbalRotation.gimbalRotation(
-            withPitchValue: NSNumber(value: bounded), rollValue: nil, yawValue: nil,
+        let rotation = DJIGimbalRotation(
+            pitchValue: NSNumber(value: bounded), rollValue: nil, yawValue: nil,
             time: 0.2, mode: .absoluteAngle, ignore: false)
         gimbal.rotate(with: rotation) { [weak self] error in
             Task { @MainActor [weak self] in
@@ -102,7 +106,10 @@ final class DJIAdapter: NSObject, DroneAdapter {
     }
 
     private func refreshTelemetry() {
-        let connected = (DJISDKManager.product() as? DJIAircraft)?.isConnected ?? false
+        // Product discovery is a weak liveness signal; telemetry freshness and
+        // physical capability validation remain independent safety gates.
+        let current = DJISDKManager.product() as? DJIAircraft
+        let connected = current.map { AircraftProfile.identify($0.model).isInitialBenchTarget } ?? false
         guard connected != snapshot.connected else { return }
         if !connected {
             // A missed SDK disconnect callback must not leave the old video feed
