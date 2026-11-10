@@ -82,6 +82,24 @@ python -m pip install -e './Toolkit[mapping]'
 PYTHONPATH=Toolkit python -m aerospatial_tools spatial-demo --seed 42
 ```
 
+## P3 offline integration and safe sharing
+
+The latest integration track adds actual CPU ONNX inference of content-verified
+trusted models, a decoded-video-to-SQLite visual evidence pipeline, a
+fail-closed image-evidence release gate, an optional ROS 2 observation-only
+publisher, a device-side Core ML loader interface, and an opt-in privacy-safe
+session export in the iOS app. The UI now exposes actual ingress/drop counters
+and device thermal state. These are portable/offline integrations, not
+live DJI/AirPods SLAM or a verified physical hardware deployment.
+
+See [P3 integration contract](Docs/P3_INTEGRATION.md) and
+[P3 acceptance matrix](Docs/P3_ACCEPTANCE.md).
+
+```sh
+PYTHONPATH=Toolkit python -m aerospatial_tools video-evidence --help
+PYTHONPATH=Toolkit python -m aerospatial_tools evidence-gate --help
+```
+
 ## Architecture
 
 ```mermaid

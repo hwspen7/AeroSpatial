@@ -15,6 +15,7 @@ final class AppModel: ObservableObject {
     @Published var armed = false
     @Published var recording = false
     @Published var latestSession: URL?
+    @Published var shareableSession: URL?
     @Published var location: GeoPoint?
     @Published var phoneHeading: Double?
     @Published var relativePosition: RelativePosition?

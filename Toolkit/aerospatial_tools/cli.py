@@ -82,6 +82,20 @@ def main(argv: list[str] | None = None) -> int:
     model_cmd = commands.add_parser("model-check", help="Verify offline model catalog and file hashes")
     model_cmd.add_argument("root", type=Path)
     model_cmd.add_argument("manifest", type=Path)
+    evidence_cmd = commands.add_parser("video-evidence", help="Index offline image-only spatial evidence from decoded videos")
+    evidence_cmd.add_argument("reference", type=Path)
+    evidence_cmd.add_argument("observations", type=Path)
+    evidence_cmd.add_argument("database", type=Path)
+    evidence_cmd.add_argument("--session", required=True)
+    evidence_cmd.add_argument("--place", required=True)
+    evidence_cmd.add_argument("--calibration", default="unverified")
+    evidence_cmd.add_argument("--stride", type=int, default=5)
+    evidence_cmd.add_argument("--max-frames", type=int, default=240)
+    gate_cmd_p3 = commands.add_parser("evidence-gate", help="Fail-closed offline visual evidence quality gate")
+    gate_cmd_p3.add_argument("database", type=Path)
+    gate_cmd_p3.add_argument("--session", required=True)
+    gate_cmd_p3.add_argument("--minimum-matches", type=int, default=3)
+    gate_cmd_p3.add_argument("--maximum-uncertainty-ns", type=int, default=100_000_000)
     experiment_cmd = commands.add_parser("experiment-errors", help="Reproducible error evaluation for JSONL")
     experiment_cmd.add_argument("dataset", type=Path)
     experiment_cmd.add_argument("sha256")
@@ -101,7 +115,23 @@ def main(argv: list[str] | None = None) -> int:
     bench.add_argument("--iterations", type=int, default=5)
     args = parser.parse_args(argv)
     try:
-        if args.command == "model-check":
+        if args.command == "evidence-gate":
+            from .evidence_gate import evaluate_evidence
+            result = evaluate_evidence(
+                args.database, session=args.session,
+                minimum_matches=args.minimum_matches,
+                maximum_uncertainty_ns=args.maximum_uncertainty_ns)
+            status = 0 if result['passed'] else 1
+        elif args.command == "video-evidence":
+            from .evidence_pipeline import EvidencePipelineConfig, index_video_evidence
+            result = index_video_evidence(
+                args.reference, args.observations, args.database,
+                session=args.session, place_label=args.place,
+                calibration_id=args.calibration,
+                config=EvidencePipelineConfig(stride=args.stride,
+                                              frame_limit=args.max_frames))
+            status = 0
+        elif args.command == "model-check":
             from .model_catalog import ModelArtifact, ModelCatalog
             models = json.loads(args.manifest.read_text(encoding='utf-8'))
             if type(models) is not list or len(models) > 256:

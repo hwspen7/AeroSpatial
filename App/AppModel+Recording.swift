@@ -29,6 +29,8 @@ extension AppModel {
     func startRecording() {
         do {
             let path = try recorder.start()
+            shareableSession = nil
+            latestSession = nil
             recording = true
             log("session_start", source: "app", note: mode.rawValue)
             show("Recording to \(path.lastPathComponent)")
@@ -46,9 +48,33 @@ extension AppModel {
             switch outcome {
             case .success(let url):
                 self.latestSession = url
+                self.shareableSession = nil
                 self.show("Session saved. Export the JSONL log from the app.")
             case .failure(let error):
                 self.show("Recording flush failed: \(error.localizedDescription)")
+            }
+        }
+    }
+
+    func prepareSafeExport() {
+        guard !recording, let source = latestSession else {
+            show("Finish recording before preparing a privacy-reduced export.")
+            return
+        }
+        let destination = source.deletingLastPathComponent()
+            .appendingPathComponent("shared-\(UUID().uuidString).jsonl")
+        shareableSession = nil
+        Task.detached(priority: .utility) { [weak self] in
+            let result = Result { try SessionPrivacyExport.prepare(source: source, destination: destination) }
+            await MainActor.run {
+                guard let self, self.latestSession == source, !self.recording else { return }
+                switch result {
+                case .success:
+                    self.shareableSession = destination
+                    self.show("Privacy-reduced export prepared. Review it before sharing.")
+                case .failure(let error):
+                    self.show("Privacy export rejected: \(error.localizedDescription)")
+                }
             }
         }
     }

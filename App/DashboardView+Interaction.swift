@@ -85,6 +85,18 @@ extension DashboardView {
                 Text("Control-loop p95 (bucket bound): \(Double(latency.p95_upper_ns) / 1_000_000, specifier: "%.2f") ms, \(latency.breaches) over budget")
                     .font(.caption).foregroundStyle(.secondary)
             }
+            if let ingress = model.ingressPublisher?.snapshot() {
+                Text("Sensor ingress: \(ingress.published) published, " +
+                     "\(ingress.rejected) queue rejects, \(ingress.nativeRejected) bus rejects")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+            if let video = model.videoPacketPublisher?.snapshot() {
+                Text("H.264 chunks: \(video.queued) queued, \(video.overwritten) overwritten, " +
+                     "\(video.rejected) rejected, \(video.forwarded) NAL units forwarded")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+            Text("Device thermal level: \(ProcessInfo.processInfo.thermalState.rawValue)")
+                .font(.caption).foregroundStyle(.secondary)
             Label(model.commandGate.pending == nil ? "No command in flight" : "Awaiting gimbal callback",
                   systemImage: model.commandGate.pending == nil ? "checkmark.shield" : "clock.arrow.circlepath")
                 .font(.caption).foregroundStyle(.secondary)
@@ -101,7 +113,7 @@ extension DashboardView {
 
     var recordingCard: some View {
         card("Session recorder", icon: "externaldrive.badge.timemachine") {
-            Text("Head pose, aircraft telemetry, calibration events and gimbal commands are stored as newline-delimited JSON for offline replay.")
+            Text("Session data stays local. Sharing requires preparing a separate privacy-reduced log without GPS coordinates, notes, or absolute timestamps.")
                 .font(.caption).foregroundStyle(.secondary)
             HStack {
                 Button(model.recording ? "Stop recording" : "Start recording") {
@@ -109,8 +121,11 @@ extension DashboardView {
                     else { model.startRecording() }
                 }
                 .buttonStyle(.borderedProminent)
-                if let url = model.latestSession {
-                    ShareLink(item: url) { Label("Export", systemImage: "square.and.arrow.up") }
+                if model.latestSession != nil && !model.recording {
+                    Button("Prepare safe export") { model.prepareSafeExport() }
+                }
+                if let url = model.shareableSession {
+                    ShareLink(item: url) { Label("Share reduced log", systemImage: "square.and.arrow.up") }
                 }
             }
         }
