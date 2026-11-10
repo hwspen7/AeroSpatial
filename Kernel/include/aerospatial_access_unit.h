@@ -34,6 +34,12 @@ void as_h264_access_destroy(ASH264AccessAssembler *assembler);
 void as_h264_access_reset(ASH264AccessAssembler *assembler);
 ASH264Status as_h264_access_feed(ASH264AccessAssembler *assembler, const uint8_t *bytes,
                                 size_t length, ASH264AccessCallback callback, void *context);
+/// Emits both NALs and access units from one incremental parser pass. The NAL
+/// callback receives borrowed bytes and must return before the memory is reused.
+/// Both callbacks are invoked serially on the calling thread.
+ASH264Status as_h264_access_feed_dual(ASH264AccessAssembler *assembler, const uint8_t *bytes,
+                                     size_t length, ASH264NalCallback nal_callback,
+                                     ASH264AccessCallback access_callback, void *context);
 /// Call only on a confirmed EOS, never on packet loss or pause.
 ASH264Status as_h264_access_finish(ASH264AccessAssembler *assembler,
                                   ASH264AccessCallback callback, void *context);

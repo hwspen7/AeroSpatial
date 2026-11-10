@@ -43,6 +43,15 @@ ASWorkStatus as_work_queue_push(ASWorkQueue *queue, ASWorkHeader header,
 /// Expired entries are discarded and counted, then the next valid item is returned.
 ASWorkStatus as_work_queue_pop(ASWorkQueue *queue, uint64_t now_ns, ASWorkHeader *header,
                                 uint8_t *buffer, size_t capacity, size_t *length);
+/// Move a queued payload into an owned lease without copying its bytes.
+/// The caller must release the lease. Queue budget is reclaimed on dequeue;
+/// outstanding lease memory remains owned by the consumer and is not included
+/// in queue_bytes. Use a separate total in-flight budget for end-to-end limits.
+typedef struct ASWorkLease ASWorkLease;
+ASWorkStatus as_work_queue_pop_lease(ASWorkQueue *queue, uint64_t now_ns,
+                                     ASWorkHeader *header, ASWorkLease **lease);
+const uint8_t *as_work_lease_data(const ASWorkLease *lease, size_t *length);
+void as_work_lease_release(ASWorkLease *lease);
 int as_work_queue_stats(const ASWorkQueue *queue, ASWorkStats *out);
 #ifdef __cplusplus
 }

@@ -52,19 +52,17 @@ public final class VideoPacketPublisher: @unchecked Sendable {
         // Coalesced wakeups avoid one Swift task per fragment. The C++ queue
         // owns memory/deadline limits and publishes only on the worker.
         worker = Task.detached(priority: .utility) {
-            guard let native, let assembler = H264UnitAssembler() else { return }
-            let pictures = onAccessUnit == nil ? nil : H264AccessUnitAssembler()
+            guard let native, let assembler = H264AccessUnitAssembler() else { return }
             var lastSerial: UInt64 = 0
             var previousFailure = false
-            var scratch: [UInt8] = []
             for await _ in signals {
-                while let job = native.pop(at: DispatchTime.now().uptimeNanoseconds,
-                                           reusing: &scratch) {
-                    guard job.payload.count > 8 else { previousFailure = true; continue }
-                    let stamp = job.payload.prefix(8).enumerated().reduce(UInt64(0)) {
-                        $0 | (UInt64($1.element) << (UInt64($1.offset) * 8))
+                while let job = native.popLeased(at: DispatchTime.now().uptimeNanoseconds) {
+                    guard job.count > 8 else { previousFailure = true; continue }
+                    let stamp = job.withUnsafeBytes { raw in
+                        raw.prefix(8).enumerated().reduce(UInt64(0)) {
+                            $0 | (UInt64($1.element) << (UInt64($1.offset) * 8))
+                        }
                     }
-                    let chunk = Data(job.payload.dropFirst(8))
                     let operationStart = DispatchTime.now().uptimeNanoseconds
                     if operationStart >= job.receivedNanoseconds {
                         metrics.recordQueueWait(operationStart - job.receivedNanoseconds)
@@ -75,23 +73,17 @@ public final class VideoPacketPublisher: @unchecked Sendable {
                     if discontinuity {
                         onDiscontinuity?()
                         assembler.reset()
-                        pictures?.reset()
                     }
                     previousFailure = false
                     do {
-                        let units = try assembler.accept(chunk)
-                        if let pictures {
-                            do {
-                                for picture in try pictures.accept(chunk) {
-                                    onAccessUnit?(picture, stamp, discontinuity)
-                                    metrics.recordAccessUnit()
-                                }
-                            } catch {
-                                pictures.reset()
-                                previousFailure = true
-                                metrics.recordAssemblyFailure()
-                            }
+                        let parsed = try job.withUnsafeBytes { raw in
+                            try assembler.acceptWithNALs(UnsafeRawBufferPointer(rebasing: raw[8...]))
                         }
+                        for picture in parsed.pictures {
+                            onAccessUnit?(picture, stamp, discontinuity)
+                            metrics.recordAccessUnit()
+                        }
+                        let units = parsed.units
                         for unit in units {
                             var quality: SpatialQuality = [.valid, .clockEstimated, .lowConfidence]
                             if discontinuity { quality.insert(.upstreamGap) }
@@ -105,7 +97,6 @@ public final class VideoPacketPublisher: @unchecked Sendable {
                         }
                     } catch {
                         assembler.reset()
-                        pictures?.reset()
                         previousFailure = true
                         metrics.record(nativeAccepted: false)
                     }

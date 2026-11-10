@@ -17,6 +17,7 @@ public final class H264AccessUnitAssembler {
     public enum Failure: Error { case invalidData, resourceLimit }
     private let native: OpaquePointer
     private var collected: [H264AccessUnit] = []
+    private var collectedNALs: [H264Unit] = []
 
     public init?(maximumNALBytes: Int = 2 * 1024 * 1024,
                  maximumAccessUnitBytes: Int = 8 * 1024 * 1024) {
@@ -42,9 +43,17 @@ public final class H264AccessUnitAssembler {
             ordinal: entry.ordinal, isKeyframe: entry.keyframe != 0))
     }
 
+    private static let nalCallback: @convention(c)
+        (UnsafeMutableRawPointer?, UnsafePointer<UInt8>?, Int, UInt8) -> Void = { context, source, count, type in
+        guard let context, let source else { return }
+        let owner = Unmanaged<H264AccessUnitAssembler>.fromOpaque(context).takeUnretainedValue()
+        owner.collectedNALs.append(H264Unit(type: type, bytes: Data(bytes: source, count: count)))
+    }
+
     public func reset() {
         as_h264_access_reset(native)
         collected.removeAll(keepingCapacity: true)
+        collectedNALs.removeAll(keepingCapacity: true)
     }
 
     public func accept(_ chunk: Data) throws -> [H264AccessUnit] {
@@ -58,6 +67,27 @@ public final class H264AccessUnitAssembler {
         case ASH264_TOO_LARGE: throw Failure.resourceLimit
         default: throw Failure.invalidData
         }
+    }
+
+    /// Processes caller-borrowed bytes. Source memory must remain valid until return.
+    public func acceptWithNALs(_ raw: UnsafeRawBufferPointer) throws
+        -> (units: [H264Unit], pictures: [H264AccessUnit]) {
+        collected.removeAll(keepingCapacity: true)
+        collectedNALs.removeAll(keepingCapacity: true)
+        let status = as_h264_access_feed_dual(native,
+            raw.bindMemory(to: UInt8.self).baseAddress, raw.count,
+            Self.nalCallback, Self.callback, Unmanaged.passUnretained(self).toOpaque())
+        switch status {
+        case ASH264_OK: return (collectedNALs, collected)
+        case ASH264_TOO_LARGE: throw Failure.resourceLimit
+        default: throw Failure.invalidData
+        }
+    }
+
+    /// Convenience path for clients holding Swift-owned bytes.
+    public func acceptWithNALs(_ chunk: Data) throws
+        -> (units: [H264Unit], pictures: [H264AccessUnit]) {
+        try chunk.withUnsafeBytes { try acceptWithNALs($0) }
     }
 
     /// Emits a trailing AU only when the source is known to have ended cleanly.

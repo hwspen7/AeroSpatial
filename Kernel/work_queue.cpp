@@ -6,6 +6,7 @@
 #include <vector>
 
 struct WorkItem { ASWorkHeader header; std::vector<uint8_t> payload; uint64_t enqueued; };
+struct ASWorkLease { std::vector<uint8_t> bytes; };
 struct ASWorkQueue {
     explicit ASWorkQueue(size_t count, size_t memory, size_t payload)
       : max_events(count), max_bytes(memory), max_payload(payload) {}
@@ -109,3 +110,40 @@ extern "C" int as_work_queue_stats(const ASWorkQueue *q, ASWorkStats *out) {
     *out = q->stats;
     return 1;
 }
+
+extern "C" ASWorkStatus as_work_queue_pop_lease(ASWorkQueue *q, uint64_t now,
+                                                 ASWorkHeader *h, ASWorkLease **lease) {
+    if (!q || !h || !lease) return ASWQ_INVALID;
+    *lease = nullptr;
+    std::lock_guard<std::mutex> lock(q->lock);
+    for (;;) {
+        auto &lane = !q->essential.empty() ? q->essential : q->optional;
+        if (lane.empty()) return q->closed ? ASWQ_CLOSED : ASWQ_EMPTY;
+        if (now < lane.front().enqueued) return ASWQ_INVALID;
+        if (now >= lane.front().header.deadline_ns) {
+            discard_front(*q, lane);
+            ++q->stats.expired;
+            continue;
+        }
+        auto *owned = new (std::nothrow) ASWorkLease;
+        if (!owned) return ASWQ_FULL;
+        *h = lane.front().header;
+        owned->bytes = std::move(lane.front().payload);
+        const auto bytes = owned->bytes.size();
+        q->stats.maximum_queue_wait_ns = std::max(q->stats.maximum_queue_wait_ns,
+                                                   now - lane.front().enqueued);
+        // Do not use discard_front: the moved-from payload has zero bytes.
+        q->stats.queue_bytes -= bytes;
+        --q->stats.queue_events;
+        lane.pop_front();
+        ++q->stats.completed;
+        *lease = owned;
+        return ASWQ_OK;
+    }
+}
+extern "C" const uint8_t *as_work_lease_data(const ASWorkLease *lease,size_t *length) {
+    if (!lease || !length) return nullptr;
+    *length = lease->bytes.size();
+    return lease->bytes.data();
+}
+extern "C" void as_work_lease_release(ASWorkLease *lease) {delete lease;}

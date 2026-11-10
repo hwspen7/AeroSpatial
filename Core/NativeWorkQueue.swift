@@ -51,6 +51,39 @@ public final class NativeWorkQueue: @unchecked Sendable {
         })
     }
 
+    /// Owned native payload moved out of the queue without a second byte copy.
+    /// The lease is released when this object is destroyed. Borrowed pointers
+    /// must never outlive their synchronous callback.
+    public final class LeasedWork {
+        private let pointer: OpaquePointer
+        public let traceID: UInt64
+        public let receivedNanoseconds: UInt64
+        public let kind: UInt32
+
+        fileprivate init(pointer: OpaquePointer, header: ASWorkHeader) {
+            self.pointer = pointer
+            traceID = header.trace_id
+            receivedNanoseconds = header.received_ns
+            kind = header.kind
+        }
+        deinit { as_work_lease_release(pointer) }
+
+        public func withUnsafeBytes<R>(_ body: (UnsafeRawBufferPointer) throws -> R) rethrows -> R {
+            var length = 0
+            let address = as_work_lease_data(pointer, &length)
+            return try body(UnsafeRawBufferPointer(start: address, count: length))
+        }
+        public var count: Int { withUnsafeBytes { $0.count } }
+    }
+
+    public func popLeased(at nowNanoseconds: UInt64) -> LeasedWork? {
+        var header = ASWorkHeader()
+        var pointer: OpaquePointer?
+        let status = as_work_queue_pop_lease(self.pointer, nowNanoseconds, &header, &pointer)
+        guard status == ASWQ_OK, let pointer else { return nil }
+        return LeasedWork(pointer: pointer, header: header)
+    }
+
     public func pop(at nowNanoseconds: UInt64) -> Work? {
         var scratch: [UInt8] = []
         return pop(at: nowNanoseconds, reusing: &scratch)

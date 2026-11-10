@@ -62,4 +62,5 @@ ASStatus as_inertial_update_position(ASInertialState *state, ASVector3 position_
 #ifdef __cplusplus
 }
 #endif
+#include "aerospatial_fusion.h"
 #endif

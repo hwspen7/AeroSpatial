@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 3.16)
 project(AeroSpatialNative LANGUAGES CXX)
 include(CTest)
+find_package(Threads REQUIRED)
 set(NATIVE_ROOT "${CMAKE_CURRENT_LIST_DIR}")
 add_library(aerospatial_native STATIC
     "${NATIVE_ROOT}/geometry.cpp"
@@ -21,12 +22,16 @@ add_library(aerospatial_native STATIC
     "${NATIVE_ROOT}/h264.cpp"
     "${NATIVE_ROOT}/access_unit.cpp"
     "${NATIVE_ROOT}/work_queue.cpp"
+    "${NATIVE_ROOT}/memory.cpp"
+    "${NATIVE_ROOT}/executor.cpp"
+    "${NATIVE_ROOT}/fusion.cpp"
     "${NATIVE_ROOT}/adaptive.cpp"
     "${NATIVE_ROOT}/bus_core.cpp"
     "${NATIVE_ROOT}/bus_consumer.cpp"
     "${NATIVE_ROOT}/bus_lease.cpp")
 target_include_directories(aerospatial_native PUBLIC "${NATIVE_ROOT}/include")
 target_compile_features(aerospatial_native PUBLIC cxx_std_17)
+target_link_libraries(aerospatial_native PUBLIC Threads::Threads)
 if(MSVC)
     target_compile_options(aerospatial_native PRIVATE /W4)
 else()
@@ -40,7 +45,7 @@ target_link_libraries(aerospatial-qos-probe PRIVATE aerospatial_native)
 target_link_libraries(aerospatial-wire-probe PRIVATE aerospatial_native)
 if(BUILD_TESTING)
     target_compile_definitions(aerospatial_native PRIVATE AEROSPATIAL_TEST_HOOKS)
-    foreach(name geometry orientation filter frames slerp transform batch bus bus_concurrency bus_resources bus_budget_race bus_faults bus_soak wire qos camera calibration tracking runtime_metrics h264 access_unit h264_real work_queue estimation adaptive)
+    foreach(name geometry orientation filter frames slerp transform batch bus bus_concurrency bus_resources bus_budget_race bus_faults bus_soak wire qos camera calibration tracking runtime_metrics h264 access_unit h264_real work_queue estimation adaptive memory executor fusion access_dual work_lease)
         add_executable(test_${name} "../NativeTests/test_${name}.cpp")
         target_link_libraries(test_${name} PRIVATE aerospatial_native)
         if(name STREQUAL "h264_real")

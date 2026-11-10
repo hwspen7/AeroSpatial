@@ -14,6 +14,7 @@ struct ASH264AccessAssembler {
     uint64_t ordinal = 0;
     ASH264Status error = ASH264_OK;
     ASH264AccessCallback callback = nullptr;
+    ASH264NalCallback nal_callback = nullptr;
     void *context = nullptr;
 };
 
@@ -76,6 +77,7 @@ void flush(ASH264AccessAssembler *a) {
 void receive_nal(void *opaque, const uint8_t *nal, size_t size, uint8_t type) {
     auto *a = static_cast<ASH264AccessAssembler *>(opaque);
     if (a->error != ASH264_OK) return;
+    if (a->nal_callback) a->nal_callback(a->context, nal, size, type);
     if (type == 9) { // Access-unit delimiter.
         flush(a);
         return;
@@ -156,6 +158,7 @@ extern "C" ASH264Status as_h264_access_feed(ASH264AccessAssembler *a, const uint
                                               size_t n, ASH264AccessCallback cb, void *ctx) {
     if (!a || !cb || (!data && n)) return ASH264_INVALID;
     a->callback = cb;
+    a->nal_callback = nullptr;
     a->context = ctx;
     a->error = ASH264_OK;
     ASH264Status status = ASH264_INVALID;
@@ -165,10 +168,27 @@ extern "C" ASH264Status as_h264_access_feed(ASH264AccessAssembler *a, const uint
     if (status != ASH264_OK) reset(a);
     return status;
 }
+extern "C" ASH264Status as_h264_access_feed_dual(ASH264AccessAssembler *a,
+        const uint8_t *data, size_t n, ASH264NalCallback nal_cb,
+        ASH264AccessCallback access_cb, void *ctx) {
+    if (!a || (!nal_cb && !access_cb) || (!data && n)) return ASH264_INVALID;
+    a->callback = access_cb;
+    a->nal_callback = nal_cb;
+    a->context = ctx;
+    a->error = ASH264_OK;
+    ASH264Status status = ASH264_INVALID;
+    try { status = as_h264_feed(a->parser, data, n, receive_nal, a); }
+    catch (...) { status = ASH264_TOO_LARGE; }
+    if (status == ASH264_OK) status = a->error;
+    if (status != ASH264_OK) reset(a);
+    a->nal_callback = nullptr;
+    return status;
+}
 extern "C" ASH264Status as_h264_access_finish(ASH264AccessAssembler *a,
                                                 ASH264AccessCallback cb, void *ctx) {
     if (!a || !cb) return ASH264_INVALID;
     a->callback = cb;
+    a->nal_callback = nullptr;
     a->context = ctx;
     a->error = ASH264_OK;
     ASH264Status status = ASH264_INVALID;
