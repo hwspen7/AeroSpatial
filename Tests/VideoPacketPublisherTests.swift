@@ -65,6 +65,28 @@ private final class AccessUnitSink: @unchecked Sendable {
 }
 
 final class VideoAccessIntegrationTests: XCTestCase {
+    func testGracefulEndFlushesLastFrameButDisconnectDoesNot() async throws {
+        let stream = Data([0, 0, 1, 0x67, 0x42, 0, 0x1f,
+                           0, 0, 1, 0x68, 0xce, 0x3c,
+                           0, 0, 1, 0x65, 0x80, 0x55])
+        let clean = AccessUnitSink()
+        let bus = try SpatialBus()
+        let cleanProducer = VideoPacketPublisher(bus: bus, capacity: 4,
+            onAccessUnit: { picture, _, _ in clean.collect(picture) })
+        XCTAssertTrue(cleanProducer.receive(stream, receivedAtNanoseconds: 50))
+        await cleanProducer.finish()
+        XCTAssertEqual(clean.count, 1)
+        XCTAssertEqual(cleanProducer.snapshot().accessUnits, 1)
+
+        let abrupt = AccessUnitSink()
+        let interruptedProducer = VideoPacketPublisher(bus: bus, capacity: 4,
+            onAccessUnit: { picture, _, _ in abrupt.collect(picture) })
+        XCTAssertTrue(interruptedProducer.receive(stream, receivedAtNanoseconds: 51))
+        interruptedProducer.markDiscontinuity()
+        await interruptedProducer.finish()
+        XCTAssertEqual(abrupt.count, 0)
+    }
+
     func testNativeVideoQueueDeliversCompleteAccessUnits() async throws {
         let bus = try SpatialBus()
         let observer = AccessUnitSink()

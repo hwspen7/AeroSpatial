@@ -27,6 +27,14 @@ ASStatus as_fusion_imu(ASFusion *fusion, uint64_t sequence, double time_seconds,
 ASStatus as_fusion_position(ASFusion *fusion, uint64_t sequence, double time_seconds,
                             ASVector3 position_enu, double standard_deviation_m,
                             double maximum_nis);
+/// Optional bounded delayed position update. Replays at most 255 subsequent IMU
+/// checkpoints transactionally, including accepted position updates. The source
+/// time must match a retained IMU checkpoint within 1 microsecond; no timestamp
+/// interpolation, capture-time inference or metric frame registration occurs.
+/// No update is committed if a later accepted position becomes inconsistent.
+ASStatus as_fusion_position_replay(ASFusion *fusion, uint64_t sequence,
+                                   double time_seconds, ASVector3 position_enu,
+                                   double standard_deviation_m, double maximum_nis);
 int as_fusion_snapshot(const ASFusion *fusion, ASInertialState *state, ASFusionReport *report);
 #ifdef __cplusplus
 }

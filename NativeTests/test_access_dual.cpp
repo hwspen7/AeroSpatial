@@ -36,4 +36,19 @@ int main(){
     REQUIRE(r.nals>=4 && r.pictures==2 && r.keyframes==1);
     REQUIRE(r.types[0]==7 && r.types[1]==8);
     as_h264_access_destroy(parser);
+
+    // An encoded stream without a trailing AUD still has a complete last
+    // picture at a *confirmed* EOS. The dual API emits its final NAL too.
+    auto *end_parser=as_h264_access_create(128,512);
+    REQUIRE(end_parser);
+    Received clean;
+    const uint8_t unclosed[]={0,0,1,0x67,0x42,0,0x1f,
+                                0,0,1,0x68,0xce,0x3c,
+                                0,0,1,0x65,0x80,0x55};
+    REQUIRE(as_h264_access_feed_dual(end_parser,unclosed,sizeof(unclosed),
+                                      nal,access,&clean)==ASH264_OK);
+    REQUIRE(clean.pictures==0 && clean.nals==2);
+    REQUIRE(as_h264_access_finish_dual(end_parser,nal,access,&clean)==ASH264_OK);
+    REQUIRE(clean.pictures==1 && clean.keyframes==1 && clean.nals==3);
+    as_h264_access_destroy(end_parser);
 }

@@ -25,6 +25,7 @@ public final class VideoPacketPublisher: @unchecked Sendable {
     private let continuation: AsyncStream<Void>.Continuation
     private let nativeQueue: NativeWorkQueue?
     private let worker: Task<Void, Never>
+    private let completion: VideoGracefulCompletion
     private var closed = false
     private var lastReceived: UInt64 = 0
     private var pendingGap = true
@@ -49,11 +50,14 @@ public final class VideoPacketPublisher: @unchecked Sendable {
         continuation = producer!
         let metrics = VideoPacketMetrics()
         self.metrics = metrics
+        let completion = VideoGracefulCompletion()
+        self.completion = completion
         // Coalesced wakeups avoid one Swift task per fragment. The C++ queue
         // owns memory/deadline limits and publishes only on the worker.
         worker = Task.detached(priority: .utility) {
             guard let native, let assembler = H264AccessUnitAssembler() else { return }
             var lastSerial: UInt64 = 0
+            var lastStamp: UInt64 = 0
             var previousFailure = false
             for await _ in signals {
                 while let job = native.popLeased(at: DispatchTime.now().uptimeNanoseconds) {
@@ -63,6 +67,7 @@ public final class VideoPacketPublisher: @unchecked Sendable {
                             $0 | (UInt64($1.element) << (UInt64($1.offset) * 8))
                         }
                     }
+                    lastStamp = stamp
                     let operationStart = DispatchTime.now().uptimeNanoseconds
                     if operationStart >= job.receivedNanoseconds {
                         metrics.recordQueueWait(operationStart - job.receivedNanoseconds)
@@ -104,6 +109,29 @@ public final class VideoPacketPublisher: @unchecked Sendable {
                     if finished >= operationStart {
                         metrics.recordProcessing(finished - operationStart)
                     }
+                }
+            }
+            // A forced close (disconnect, disposal, queue failure) MUST NOT
+            // turn a partial compressed picture into an apparently valid frame.
+            // Only finish() from a healthy producer is a confirmed clean EOS.
+            if completion.graceful && !previousFailure && lastSerial > 0 {
+                do {
+                    let tail = try assembler.finishWithNALs()
+                    for picture in tail.pictures {
+                        onAccessUnit?(picture, lastStamp, false)
+                        metrics.recordAccessUnit()
+                    }
+                    for unit in tail.units {
+                        let quality: SpatialQuality = [.valid, .clockEstimated, .lowConfidence]
+                        let status = bus.publish(stream: .video,
+                            timestampNanoseconds: lastStamp,
+                            clockDomain: 1,
+                            kind: Self.h264NALKindBase | UInt32(unit.type),
+                            quality: quality, payload: unit.bytes)
+                        metrics.record(nativeAccepted: status == 0)
+                    }
+                } catch {
+                    metrics.recordAssemblyFailure()
                 }
             }
             native.close()
@@ -174,7 +202,14 @@ public final class VideoPacketPublisher: @unchecked Sendable {
 
     /// Finishes the producer and waits until the native bus worker drains.
     public func finish() async {
-        close()
+        lock.lock()
+        if !closed {
+            // Pending source loss means the stream cannot be cleanly flushed.
+            if acceptedSerial > 0 && !pendingGap { completion.markGraceful() }
+            closed = true
+            continuation.finish()
+        }
+        lock.unlock()
         await worker.value
     }
 
@@ -185,6 +220,22 @@ public final class VideoPacketPublisher: @unchecked Sendable {
     }
 
     deinit { close() }
+}
+
+/// One-way flag shared between the producer close path and native worker.
+private final class VideoGracefulCompletion: @unchecked Sendable {
+    private let lock = NSLock()
+    private var requested = false
+    var graceful: Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return requested
+    }
+    func markGraceful() {
+        lock.lock()
+        requested = true
+        lock.unlock()
+    }
 }
 
 /// Lock-protected metrics are updated by the detached worker only.

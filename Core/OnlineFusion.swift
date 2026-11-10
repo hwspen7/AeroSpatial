@@ -58,6 +58,16 @@ public final class OnlineFusion {
             standardDeviationMeters, maximumNIS))
     }
 
+    /// Replays a delayed, time-aligned position measurement over retained IMU
+    /// checkpoints. No interpolation or implicit clock-domain conversion.
+    public func observeDelayedPosition(sequence: UInt64, at timeSeconds: Double,
+                                       position: SpatialVector, standardDeviationMeters: Double,
+                                       maximumNIS: Double = 11.3449) -> Outcome {
+        Self.outcome(as_fusion_position_replay(handle, sequence, timeSeconds,
+            ASVector3(x: position.east, y: position.north, z: position.up),
+            standardDeviationMeters, maximumNIS))
+    }
+
     public func snapshot() -> Snapshot? {
         var state = ASInertialState()
         var report = ASFusionReport()

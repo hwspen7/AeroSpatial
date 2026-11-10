@@ -43,6 +43,11 @@ ASH264Status as_h264_access_feed_dual(ASH264AccessAssembler *assembler, const ui
 /// Call only on a confirmed EOS, never on packet loss or pause.
 ASH264Status as_h264_access_finish(ASH264AccessAssembler *assembler,
                                   ASH264AccessCallback callback, void *context);
+/// Graceful EOS dual output. Unlike disconnect/reset, flushes the final NAL
+/// and final picture only when the caller explicitly confirms a clean end.
+ASH264Status as_h264_access_finish_dual(ASH264AccessAssembler *assembler,
+                                      ASH264NalCallback nal_callback,
+                                      ASH264AccessCallback access_callback, void *context);
 
 #ifdef __cplusplus
 }

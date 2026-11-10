@@ -90,6 +90,20 @@ public final class H264AccessUnitAssembler {
         try chunk.withUnsafeBytes { try acceptWithNALs($0) }
     }
 
+    /// Emits the final NAL and picture after a confirmed graceful EOS.
+    /// Never invoke this on packet loss or source disconnection.
+    public func finishWithNALs() throws -> (units: [H264Unit], pictures: [H264AccessUnit]) {
+        collected.removeAll(keepingCapacity: true)
+        collectedNALs.removeAll(keepingCapacity: true)
+        let status = as_h264_access_finish_dual(native, Self.nalCallback, Self.callback,
+                                                Unmanaged.passUnretained(self).toOpaque())
+        switch status {
+        case ASH264_OK: return (collectedNALs, collected)
+        case ASH264_TOO_LARGE: throw Failure.resourceLimit
+        default: throw Failure.invalidData
+        }
+    }
+
     /// Emits a trailing AU only when the source is known to have ended cleanly.
     public func finish() throws -> [H264AccessUnit] {
         collected.removeAll(keepingCapacity: true)

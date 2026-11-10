@@ -29,6 +29,32 @@ final class NativeMemoryAndFusionTests: XCTestCase {
         XCTAssertEqual(lease.withUnsafeBytes { Array($0) }, [9, 8, 7, 6])
     }
 
+    func testLatePositionReplayIsBoundedAndValidated() throws {
+        let pose = SpatialPose3(position: SpatialVector(east: 0, north: 0, up: 0),
+                                orientation: SpatialQuaternion(w: 1, x: 0, y: 0, z: 0))
+        let fusion = try XCTUnwrap(OnlineFusion(timeSeconds: 1, initialPose: pose,
+            initialStandardDeviations: [1, 1, 0.1, 0.1, 0.1],
+            noise: InertialNoise(accelerometerStd: 0.1, gyroscopeStd: 0.01,
+                accelerometerBiasWalk: 0.001, gyroscopeBiasWalk: 0.001,
+                maximumStepSeconds: 0.1)))
+        for i in 1...4 {
+            XCTAssertEqual(fusion.predict(sequence: UInt64(i),
+                at: 1 + Double(i) * 0.01,
+                specificForce: SpatialVector(east: 0, north: 0, up: 9.80665),
+                angularVelocity: SpatialVector(east: 0, north: 0, up: 0)), .accepted)
+        }
+        XCTAssertEqual(fusion.observeDelayedPosition(sequence: 1, at: 1.02,
+            position: SpatialVector(east: 0.2, north: 0, up: 0),
+            standardDeviationMeters: 0.5), .accepted)
+        XCTAssertEqual(fusion.observeDelayedPosition(sequence: 2, at: 1.025,
+            position: SpatialVector(east: 0, north: 0, up: 0),
+            standardDeviationMeters: 0.5), .rejected)
+        XCTAssertEqual(fusion.observeDelayedPosition(sequence: 2, at: 1.03,
+            position: SpatialVector(east: 10000, north: 0, up: 0),
+            standardDeviationMeters: 0.5), .rejectedOutlier)
+        XCTAssertEqual(fusion.snapshot()?.report.corrected, 1)
+    }
+
     func testOnlineFusionRejectsBadTimeAndOutlier() throws {
         let pose = SpatialPose3(position: SpatialVector(east: 0, north: 0, up: 0),
                                 orientation: SpatialQuaternion(w: 1, x: 0, y: 0, z: 0))

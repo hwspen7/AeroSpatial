@@ -9,7 +9,7 @@ is not proof of hardware compatibility. Do not substitute a simulator for a dron
 | P0 requirement | Portable implementation | Current software evidence | Physical closure gate |
 | --- | --- | --- | --- |
 | Real-time ingress | Bounded Swift queues, native pub/sub, fail-visible counters | Swift ingress tests | iPhone p95/p99 age and queue drops under load |
-| Video input | DJI V4 listener behind SDK guard, serial callback queue, bounded chunks, C++ Annex-B NAL reassembly | CTest native_h264, Swift NAL and packet tests | DJI SDK compile and true Mavic Air 2 encoded feed; decoder access-unit/frame tests |
+| Video input | DJI V4 listener behind SDK guard, serial callback queue, bounded chunks, single-pass C++ NAL/access-unit assembly, AVCC VideoToolbox bridge | CTest native_h264, Swift NAL and packet tests | DJI SDK compile and true Mavic Air 2 encoded feed; decoder access-unit/frame tests |
 | Clock alignment | Bounded robust affine fit with uncertainty and explicit clock domain | Swift clock tests | Paired hardware timestamp measurements for each source |
 | Device capability discovery | SDK model check, observed component evidence, strict unverified state | Swift model/evidence tests | Firmware, device features and supported axes verified on a physical aircraft |
 | Durable recording | CRC-framed segment archive, background admission, validated JSONL export | Swift recovery/corruption tests | Application crash, restart, full storage and retention on an iPhone |
@@ -20,11 +20,13 @@ is not proof of hardware compatibility. Do not substitute a simulator for a dron
 ## Critical video semantics
 
 The DJI listener receives arbitrary encoded **byte fragments**, not access
-units or `CMSampleBuffer` frames. The C++ Annex-B parser emits bounded H.264
-NAL units, not complete pictures. Published events use kind `0x200 | nal_type`.
-Frames need a separate access-unit assembler, validated SPS/PPS and VideoToolbox
-sample conversion, and genuine capture timestamps. Receipt timestamps use the
-host monotonic clock and carry `clockEstimated` and `lowConfidence` flags.
+units or `CMSampleBuffer` frames. The C++ Annex-B NAL parser now shares
+its incremental pass with a bounded access-unit assembler, SPS/PPS handling and AVCC conversion. Normal
+end-of-stream flushes a trailing picture; interrupted streams discard the
+untrusted tail. Published diagnostics use kind `0x200 | nal_type`. Encoded
+access units reach an optional VideoToolbox bridge, but decoded frames and
+camera exposure timestamps are not confirmed on a physical Mavic Air 2.
+Receipt timestamps use the host monotonic clock and carry `clockEstimated` and `lowConfidence` flags.
 Lost chunks set `upstreamGap`, reset the parser and require decoder resync.
 
 DJI SDK symbols are guarded by `#if canImport(DJISDK)`, which means the

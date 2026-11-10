@@ -6,9 +6,9 @@ and real hardware/data integration. CI success satisfies the former only.
 
 | Original P1 area | Portable implementation | Automated evidence | Device / research gap |
 | --- | --- | --- | --- |
-| 9. Multisensor state estimation | 15D C++ ESKF, Swift adapter, offline position fusion | Native and Swift stationary/outlier tests | Raw IMU availability, precise GNSS/data clocks, measured noise |
+| 9. Multisensor state estimation | 15D C++ ESKF, Swift adapter, online IMU replay with bounded delayed position updates | Native and Swift stationary/outlier/replay tests | Raw IMU availability, precise GNSS/data clocks, measured noise |
 | 10. Lie groups | SO(3)/SE(3) exponential, logarithm, rigid transforms | Native + Swift roundtrips | Body/camera/world extrinsic calibration |
-| 11. Multirate/late samples | Bounded deterministic delayed observation replay | In-order vs late tests, sliding-window test | Live sensor rates, timestamp correlation |
+| 11. Multirate/late samples | Bounded C++ IMU checkpoint replay for matched position timestamps, plus offline deterministic replay | In-order vs late correction tests, transactional rejection, bounded history test | Live sensor rates, timestamp correlation |
 | 12. Visual odometry | ORB/essential matrix, PnP, triangulation | Synthetic pinhole 3D point tests | Scene degeneracy/scale, actual images |
 | 13. Robust local optimization | 6D pose graph, bundle adjustment + metric anchors | Reprojection and loop edge fixtures | Diverse real sequences, long trajectory drift |
 | 14. Sparse 3D map | Bounded landmarks, voxel index, keyframe provenance | Query and invalid source tests | Metric mapping from actual camera and world datum |
@@ -25,7 +25,8 @@ metric monocular localization, live aerial navigation or global map accuracy.
 
 - Actual Mavic Air 2 DJI SDK video access unit parsing and hardware decoding.
 - Physical iPhone/AirPods/DJI timestamp and telemetry calibration.
-- Continuous live inertial fusion with a device that exposes verified raw IMU.
+- Continuous live inertial fusion with a device that exposes verified raw IMU,
+  plus real calibrated ENU position and paired device clock evidence.
 - Deterministic, labeled multi-session VO/SLAM benchmark dataset with error bars.
 - App-level model runtime lifecycle, durable map storage and true zero-copy
   CVPixelBuffer tracking.

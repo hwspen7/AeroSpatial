@@ -184,11 +184,11 @@ extern "C" ASH264Status as_h264_access_feed_dual(ASH264AccessAssembler *a,
     a->nal_callback = nullptr;
     return status;
 }
-extern "C" ASH264Status as_h264_access_finish(ASH264AccessAssembler *a,
-                                                ASH264AccessCallback cb, void *ctx) {
-    if (!a || !cb) return ASH264_INVALID;
-    a->callback = cb;
-    a->nal_callback = nullptr;
+extern "C" ASH264Status as_h264_access_finish_dual(ASH264AccessAssembler *a,
+        ASH264NalCallback nal_cb, ASH264AccessCallback access_cb, void *ctx) {
+    if (!a || (!nal_cb && !access_cb)) return ASH264_INVALID;
+    a->callback = access_cb;
+    a->nal_callback = nal_cb;
     a->context = ctx;
     a->error = ASH264_OK;
     ASH264Status status = ASH264_INVALID;
@@ -197,5 +197,11 @@ extern "C" ASH264Status as_h264_access_finish(ASH264AccessAssembler *a,
     if (status == ASH264_OK) status = a->error;
     if (status == ASH264_OK) flush(a);
     reset(a);
+    a->nal_callback = nullptr;
     return status;
+}
+extern "C" ASH264Status as_h264_access_finish(ASH264AccessAssembler *a,
+                                                ASH264AccessCallback cb, void *ctx) {
+    if (!cb) return ASH264_INVALID;
+    return as_h264_access_finish_dual(a, nullptr, cb, ctx);
 }

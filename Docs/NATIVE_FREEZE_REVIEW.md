@@ -11,6 +11,11 @@ single incremental parser pass. Existing NAL and access-unit APIs remain
 available. Source resets still require a fresh SPS/PPS and IDR. H.264 slice
 handling continues to exclude complex interlaced and exotic streams.
 
+Cleanly ended H.264 streams now flush their final NAL and access unit through
+`as_h264_access_finish_dual` and the explicit Swift `finish()` path. Forced
+closure and declared disconnects do not flush an unverified partial picture.
+This does not confer source capture timestamps or support exotic slice modes.
+
 `as_work_queue_pop_lease` transfers ownership of an encoded packet without
 copying its bytes after dequeue. The Swift video worker borrows those bytes
 only while invoking the native incremental parser. Output NAL diagnostic
@@ -41,17 +46,26 @@ shutdown/destroy only after external submitters have quiesced.
 `as_fusion_*` wraps the existing 15-error-state ESKF, with separate monotonic
 sequence checks for IMU and position observations, timestamp matching,
 chi-square innovation rejection, and explicit unhealthy state after a long
-IMU gap. It requires real calibrated ENU positions, body-frame specific force,
-measured noise, and a known initial pose. **Delayed position observations are
-rejected**, not silently applied to a later state. Re-initialize a new engine
-after a declared gap. This estimator is not wired to DJI or flight commands;
-there is no claim that the Mavic Air 2 exposes a usable raw IMU stream.
+IMU gap. The default `as_fusion_position` requires the latest state time.
+`as_fusion_position_replay` offers **opt-in, bounded, transactional delayed
+position correction** at a retained IMU checkpoint (256 checkpoints total,
+maximum four corrections per checkpoint), replaying subsequent IMU and
+already accepted position observations. Nonmatching timestamps, stale history,
+and inconsistent downstream updates are rejected without mutating the state.
+The normal current-time correction does not copy the replay history.
+
+This requires real calibrated ENU positions, body-frame specific force,
+measured noise, a known initial pose and trustworthy shared timestamps.
+Re-initialize a new engine after a declared IMU gap. This estimator is not
+wired to DJI or flight commands; there is no claim that the Mavic Air 2
+exposes a usable raw IMU stream.
 
 ## Verification
 
 - Debug CMake/CTest runs native assertions, including new dual-parser, lease,
   executor, and online fusion suites.
-- Swift Package unit tests exercise the native interfaces through the C ABI.
+- Swift Package unit tests exercise the native interfaces through the C ABI,
+  including graceful EOS vs disconnect and delayed-fusion replay refusal.
 - Python toolkit regression, synthetic sessions and integrity checks are run
   by `Scripts/run-checks.sh`.
 - ASan/UBSan validate native memory and undefined behavior on the available

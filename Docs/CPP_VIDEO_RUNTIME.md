@@ -19,7 +19,9 @@ DJI MSDK V4 encoded callback
     -> CVPixelBuffer callback for a trusted optional model consumer
 ```
 
-The C++ assembler exports a stable C ABI in `Kernel/include/aerospatial_access_unit.h`. NAL units remain available on the existing native bus for diagnostics and backwards compatibility. Assemblers require SPS, PPS, and a new IDR after resets; they never silently treat one SDK callback as one picture. Parameter changes recreate the VideoToolbox format/session. Native callbacks borrow their storage only while executing; Swift copies access units before asynchronous use. The VideoToolbox bridge is Apple-specific and must remain in Swift; portable C++ cannot directly use iOS frameworks.
+The C++ assembler exports a stable C ABI in `Kernel/include/aerospatial_access_unit.h`. NAL units remain available on the existing native bus for diagnostics and backwards compatibility. Graceful EOS emits the last NAL and access unit, while a disconnect or forced
+close explicitly discards the unverified tail. Assemblers require SPS, PPS,
+and a new IDR after resets; they never silently treat one SDK callback as one picture. Parameter changes recreate the VideoToolbox format/session. Native callbacks borrow their storage only while executing; Swift copies access units before asynchronous use. The VideoToolbox bridge is Apple-specific and must remain in Swift; portable C++ cannot directly use iOS frameworks.
 
 The encoded stream uses an **estimated SDK callback receipt timestamp**, not a DJI-provided camera exposure timestamp, verified PTS/DTS, or real time. PTS is provisionally monotonic and appropriate for basic streams without complex reordering. The parser uses AUD or `first_mb_in_slice` to delimit pictures; interlaced, field-coded, partitioned and other exotic H.264 configurations are **not** production-validated. Support for B-frame reorder, true capture timestamps, complex slice-header picture identity, AV1, H.265 and arbitrary codec switching is outside this implementation. A decoder-ready packet alone does not prove that a physical DJI controller supplied a valid stream.
 
