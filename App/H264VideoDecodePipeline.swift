@@ -107,7 +107,10 @@ final class H264VideoDecodePipeline: @unchecked Sendable {
                         rejected: rejected, queueDropped: dropped, pending: pending)
     }
 
-    private enum Failure: Error { case format(OSStatus), block(OSStatus), sample(OSStatus) }
+    private enum Failure: Error {
+        case format(OSStatus), block(OSStatus), sample(OSStatus)
+        case invalidDimensions, missingFormat
+    }
 
     /// Validates SPS/PPS using CoreMedia and obtains dimensions from the stream.
     private func makeFormat(sps: Data, pps: Data) throws -> CMFormatDescription {
@@ -128,13 +131,13 @@ final class H264VideoDecodePipeline: @unchecked Sendable {
         let dimensions = CMVideoFormatDescriptionGetDimensions(format)
         guard dimensions.width > 0, dimensions.height > 0,
               dimensions.width <= 8192, dimensions.height <= 8192 else {
-            throw Failure.format(paramErr)
+            throw Failure.invalidDimensions
         }
         return format
     }
 
     private func makeSample(avcc: Data, presentationNanoseconds: UInt64) throws -> CMSampleBuffer {
-        guard let format else { throw Failure.format(paramErr) }
+        guard let format else { throw Failure.missingFormat }
         var block: CMBlockBuffer?
         let length = avcc.count
         let allocated = CMBlockBufferCreateWithMemoryBlock(
