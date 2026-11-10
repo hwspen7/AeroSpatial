@@ -37,9 +37,10 @@ jobs:
           python-version: '3.11'
       - name: Compile native algorithms
         run: |
-          cmake -S Kernel -B build-native -DCMAKE_BUILD_TYPE=Release
+          cmake -S Kernel -B build-native -DCMAKE_BUILD_TYPE=Release -DAEROSPATIAL_BUILD_WORK_BENCHMARK=ON
           cmake --build build-native --parallel 4
           ctest --test-dir build-native --output-on-failure
+          ./build-native/aerospatial-work-bench 10000 1024
       - name: Native multimodal bus throughput smoke test
         run: |
           cmake -S Kernel -B build-bus -DCMAKE_BUILD_TYPE=Release -DAEROSPATIAL_BUILD_BUS_BENCHMARK=ON

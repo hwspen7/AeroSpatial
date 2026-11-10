@@ -81,6 +81,12 @@ extension DashboardView {
                      "Aircraft: \(aircraft.accepted) accepted, \(aircraft.rejected) rejected, \(aircraft.observedGaps) gaps.")
                     .font(.caption).foregroundStyle(.secondary)
             }
+            if let clock = model.controlCadence?.diagnostic() {
+                if let latency = clock.latency, latency.samples > 0 {
+                    Text("Control delivery p95 (upper bound): \(Double(latency.p95_upper_ns) / 1_000_000, specifier: "%.2f") ms; \(clock.missed) coalesced ticks")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+            }
             if let latency = model.controlLatency?.report(), latency.samples > 0 {
                 Text("Control-loop p95 (bucket bound): \(Double(latency.p95_upper_ns) / 1_000_000, specifier: "%.2f") ms, \(latency.breaches) over budget")
                     .font(.caption).foregroundStyle(.secondary)
@@ -92,7 +98,15 @@ extension DashboardView {
             }
             if let video = model.videoPacketPublisher?.snapshot() {
                 Text("H.264 chunks: \(video.queued) queued, \(video.overwritten) overwritten, " +
-                     "\(video.rejected) rejected, \(video.forwarded) NAL units forwarded")
+                     "\(video.rejected) rejected, \(video.expired) expired, " +
+                     "\(video.forwarded) NAL units, \(video.accessUnits) access units")
+                Text("Video queue p95: \(Double(video.queueP95Nanoseconds) / 1_000_000, specifier: "%.2f") ms; " +
+                     "processing p95: \(Double(video.processingP95Nanoseconds) / 1_000_000, specifier: "%.2f") ms")
+                    .font(.caption).foregroundStyle(.secondary)
+                let decoder = model.videoDecoder.snapshot()
+                Text("Video decode: \(decoder.submitted) submitted, \(decoder.decoded) decoded, " +
+                     "\(decoder.rejected) failed, \(decoder.queueDropped) queued drops")
+                    .font(.caption).foregroundStyle(.secondary)
                     .font(.caption).foregroundStyle(.secondary)
             }
             Text("Device thermal level: \(ProcessInfo.processInfo.thermalState.rawValue)")

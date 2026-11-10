@@ -100,6 +100,10 @@ PYTHONPATH=Toolkit python -m aerospatial_tools video-evidence --help
 PYTHONPATH=Toolkit python -m aerospatial_tools evidence-gate --help
 ```
 
+## C++ video and real-time strengthening
+
+The C++ foundation now assembles H.264 **access units** from arbitrarily split DJI SDK Annex-B callback chunks (with IDR resynchronization and SPS/PPS provenance), rather than treating each NAL as a decoded picture. A bounded native deadline/priority work queue separates optional video work from the SwiftUI run loop. iOS CoreMedia/VideoToolbox receives complete AVCC samples and exposes decoded `CVPixelBuffer` to an optional model consumer. Control cadence uses a dedicated monotonic scheduler and measures delivery jitter; the safety state machine remains separately authorized. See [native video and runtime contract](Docs/CPP_VIDEO_RUNTIME.md). None of these portable tests establish real DJI camera timestamps, device decoding performance or airworthiness.
+
 ## Architecture
 
 ```mermaid

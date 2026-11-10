@@ -48,3 +48,38 @@ final class H264UnitAssemblerTests: XCTestCase {
         XCTAssertThrowsError(try parser.accept(Data(repeating: 0x55, count: 32)))
     }
 }
+
+private final class AccessUnitSink: @unchecked Sendable {
+    private let lock = NSLock()
+    private var items: [H264AccessUnit] = []
+    func collect(_ value: H264AccessUnit) {
+        lock.lock()
+        items.append(value)
+        lock.unlock()
+    }
+    var count: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return items.count
+    }
+}
+
+final class VideoAccessIntegrationTests: XCTestCase {
+    func testNativeVideoQueueDeliversCompleteAccessUnits() async throws {
+        let bus = try SpatialBus()
+        let observer = AccessUnitSink()
+        let publisher = VideoPacketPublisher(bus: bus, capacity: 4,
+            onAccessUnit: { unit, _, _ in observer.collect(unit) })
+        let stream = Data([0, 0, 1, 0x67, 0x42, 0, 0x1f,
+                           0, 0, 1, 0x68, 0xce, 0x3c,
+                           0, 0, 1, 0x65, 0x80, 0x55,
+                           0, 0, 1, 0x41, 0x80, 0x66,
+                           0, 0, 1, 0x09, 0xf0, 0, 0, 1, 0x09, 0xf0])
+        XCTAssertTrue(publisher.receive(stream, receivedAtNanoseconds: 50))
+        await publisher.finish()
+        XCTAssertEqual(observer.count, 2)
+        XCTAssertEqual(publisher.snapshot().accessUnits, 2)
+        XCTAssertEqual(publisher.snapshot().assemblyFailures, 0)
+        XCTAssertEqual(publisher.snapshot().nativeRejected, 0)
+    }
+}

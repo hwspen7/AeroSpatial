@@ -21,3 +21,12 @@ authorize flight or alter the existing command gate.
 IMU availability, device calibration, iPhone thermal and memory acceptance,
 long-term environment change detection, actual real-time Core ML deployment,
 and DJI SDK-specific hardware validation.
+
+## Subsequent C++ runtime and video integration
+
+- Portable C++ H.264 access-unit assembly and AVCC/SPS/PPS interface: implemented and tested on a genuine generated H.264 elementary stream, with seeded callback partitions.
+- Native bounded priority/deadline work queue used by video ingress: implemented, native concurrency/overload tests and Swift bridge tests.
+- iOS VideoToolbox sample conversion and serial decode path: source integrated, requires GitHub Xcode build and physical device decoder verification.
+- Independent control cadence and lateness diagnostics: source integrated, still MainActor state-machine execution; physical latency and safety tests outstanding.
+
+See `Docs/CPP_VIDEO_RUNTIME.md`. No physical completion is inferred.

@@ -52,6 +52,7 @@ final class AppModel: ObservableObject {
     let spatialBus = try? SpatialBus()
     lazy var ingressPublisher = spatialBus.map { SpatialIngressPublisher(bus: $0) }
     var videoPacketPublisher: VideoPacketPublisher?
+    let videoDecoder = H264VideoDecodePipeline()
     var tracking = HeadTrackingController()
     let runtimeSupervisor = SafetySupervisor()
     let controlLatency = NativeRuntimeMetrics(deadlineNanoseconds: 5_000_000)
@@ -61,7 +62,7 @@ final class AppModel: ObservableObject {
     var spatialAwareness = HeadRelativeAwareness()
     var advisor = PassiveAdvisor()
     var adapter: DroneAdapter = SimulatorDroneAdapter()
-    var controlTimer: Timer?
+    var controlCadence: ControlCadence?
     var demoInputEnabled = false
     var started = false
 
@@ -104,8 +105,14 @@ final class AppModel: ObservableObject {
         guard !started else { return }
         started = true
         adapter.connect()
-        controlTimer = Timer.scheduledTimer(withTimeInterval: 0.15, repeats: true) { [weak self] _ in
-            MainActor.assumeIsolated { self?.controlTick() }
+        let cadence = ControlCadence()
+        controlCadence = cadence
+        cadence.start { [weak self, weak cadence] scheduled in
+            Task { @MainActor [weak self, weak cadence] in
+                guard let self, self.started else { cadence?.completed(scheduledAt: scheduled); return }
+                self.controlTick()
+                cadence?.completed(scheduledAt: scheduled)
+            }
         }
     }
 
@@ -117,8 +124,8 @@ final class AppModel: ObservableObject {
         headRelativeCue = nil
         pilot.stop()
         audio.silence()
-        controlTimer?.invalidate()
-        controlTimer = nil
+        controlCadence?.stop()
+        controlCadence = nil
         adapter.disconnect()
         commandGate.reset()
         sensorHealth.reset()
@@ -157,7 +164,14 @@ final class AppModel: ObservableObject {
 
     func configureAdapter() {
         videoPacketPublisher?.close()
-        videoPacketPublisher = mode == .dji ? spatialBus.map { VideoPacketPublisher(bus: $0) } : nil
+        videoDecoder.markDiscontinuity()
+        videoPacketPublisher = mode == .dji ? spatialBus.map { bus in
+            VideoPacketPublisher(bus: bus,
+                onAccessUnit: { [videoDecoder] unit, timestamp, _ in
+                    videoDecoder.accept(unit, receivedAtNanoseconds: timestamp)
+                },
+                onDiscontinuity: { [videoDecoder] in videoDecoder.markDiscontinuity() })
+        } : nil
         adapter = DroneAdapterFactory.make(mode)
         adapter.attachVideoPublisher(videoPacketPublisher)
         adapter.observeCapabilities { [weak self] evidence in

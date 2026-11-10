@@ -1,6 +1,6 @@
 import Foundation
 
-/// Bounded H.264 elementary-stream chunk ingress, not an access-unit decoder.
+/// Native bounded H.264 chunk ingress with an optional C++ access-unit assembler.
 /// DJI SDK delivers arbitrary byte chunks, not necessarily complete video frames.
 /// Callback receipt time is explicitly marked as an estimated capture timestamp.
 public final class VideoPacketPublisher: @unchecked Sendable {
@@ -13,17 +13,17 @@ public final class VideoPacketPublisher: @unchecked Sendable {
         public var rejected: UInt64 = 0
         public var forwarded: UInt64 = 0
         public var nativeRejected: UInt64 = 0
+        public var accessUnits: UInt64 = 0
+        public var assemblyFailures: UInt64 = 0
+        public var expired: UInt64 = 0
+        public var queueP95Nanoseconds: UInt64 = 0
+        public var processingP95Nanoseconds: UInt64 = 0
     }
 
-    private struct Packet: Sendable {
-        let data: Data
-        let timestamp: UInt64
-        let gap: Bool
-        let serial: UInt64
-    }
 
     private let lock = NSLock()
-    private let continuation: AsyncStream<Packet>.Continuation
+    private let continuation: AsyncStream<Void>.Continuation
+    private let nativeQueue: NativeWorkQueue?
     private let worker: Task<Void, Never>
     private var closed = false
     private var lastReceived: UInt64 = 0
@@ -31,48 +31,91 @@ public final class VideoPacketPublisher: @unchecked Sendable {
     private var acceptedSerial: UInt64 = 0
     private var counts = Counters()
 
-    public init(bus: SpatialBus, capacity: Int = 8) {
-        var producer: AsyncStream<Packet>.Continuation?
-        let packets = AsyncStream<Packet>(
-            bufferingPolicy: .bufferingNewest(max(1, min(64, capacity)))
-        ) { producer = $0 }
-        let continuation = producer!
-        self.continuation = continuation
-        // Native publication and payload copying never run on the app's MainActor.
-        // The worker retains only the bus and a counter updater, not the adapter.
+    public init(bus: SpatialBus, capacity: Int = 8,
+                onAccessUnit: (@Sendable (H264AccessUnit, UInt64, Bool) -> Void)? = nil,
+                onDiscontinuity: (@Sendable () -> Void)? = nil) {
+        let bounded = max(1, min(64, capacity))
+        // Eight bytes contain the caller's original receipt clock. The queue
+        // itself uses the host monotonic clock for deadline admission.
+        let maximumPacket = 2 * 1024 * 1024 + 8
+        let native = NativeWorkQueue(maximumEvents: bounded,
+                                     maximumBytes: maximumPacket * bounded,
+                                     maximumPayloadBytes: maximumPacket)
+        nativeQueue = native
+        var producer: AsyncStream<Void>.Continuation?
+        let signals = AsyncStream<Void>(bufferingPolicy: .bufferingNewest(1)) {
+            producer = $0
+        }
+        continuation = producer!
         let metrics = VideoPacketMetrics()
         self.metrics = metrics
+        // Coalesced wakeups avoid one Swift task per fragment. The C++ queue
+        // owns memory/deadline limits and publishes only on the worker.
         worker = Task.detached(priority: .utility) {
-            guard let assembler = H264UnitAssembler() else { return }
+            guard let native, let assembler = H264UnitAssembler() else { return }
+            let pictures = onAccessUnit == nil ? nil : H264AccessUnitAssembler()
             var lastSerial: UInt64 = 0
             var previousFailure = false
-            for await packet in packets {
-                // A gap may arise from SDK disconnect, source errors or queue eviction.
-                // Never decode across an unobserved fragment discontinuity.
-                let discontinuity = packet.gap || previousFailure ||
-                    (lastSerial > 0 && packet.serial != lastSerial + 1)
-                lastSerial = packet.serial
-                if discontinuity { assembler.reset() }
-                previousFailure = false
-                do {
-                    let units = try assembler.accept(packet.data)
-                    for unit in units {
-                        var quality: SpatialQuality = [.valid, .clockEstimated, .lowConfidence]
-                        if discontinuity { quality.insert(.upstreamGap) }
-                        let status = bus.publish(stream: .video,
-                                                 timestampNanoseconds: packet.timestamp,
-                                                 clockDomain: 1,
-                                                 kind: Self.h264NALKindBase | UInt32(unit.type),
-                                                 quality: quality, payload: unit.bytes)
-                        metrics.record(nativeAccepted: status == 0)
-                        if status != 0 { previousFailure = true }
+            var scratch: [UInt8] = []
+            for await _ in signals {
+                while let job = native.pop(at: DispatchTime.now().uptimeNanoseconds,
+                                           reusing: &scratch) {
+                    guard job.payload.count > 8 else { previousFailure = true; continue }
+                    let stamp = job.payload.prefix(8).enumerated().reduce(UInt64(0)) {
+                        $0 | (UInt64($1.element) << (UInt64($1.offset) * 8))
                     }
-                } catch {
-                    assembler.reset()
-                    previousFailure = true
-                    metrics.record(nativeAccepted: false)
+                    let chunk = Data(job.payload.dropFirst(8))
+                    let operationStart = DispatchTime.now().uptimeNanoseconds
+                    if operationStart >= job.receivedNanoseconds {
+                        metrics.recordQueueWait(operationStart - job.receivedNanoseconds)
+                    }
+                    let discontinuity = job.kind != 0 || previousFailure ||
+                        (lastSerial > 0 && job.traceID != lastSerial + 1)
+                    lastSerial = job.traceID
+                    if discontinuity {
+                        onDiscontinuity?()
+                        assembler.reset()
+                        pictures?.reset()
+                    }
+                    previousFailure = false
+                    do {
+                        let units = try assembler.accept(chunk)
+                        if let pictures {
+                            do {
+                                for picture in try pictures.accept(chunk) {
+                                    onAccessUnit?(picture, stamp, discontinuity)
+                                    metrics.recordAccessUnit()
+                                }
+                            } catch {
+                                pictures.reset()
+                                previousFailure = true
+                                metrics.recordAssemblyFailure()
+                            }
+                        }
+                        for unit in units {
+                            var quality: SpatialQuality = [.valid, .clockEstimated, .lowConfidence]
+                            if discontinuity { quality.insert(.upstreamGap) }
+                            let status = bus.publish(stream: .video,
+                                                     timestampNanoseconds: stamp,
+                                                     clockDomain: 1,
+                                                     kind: Self.h264NALKindBase | UInt32(unit.type),
+                                                     quality: quality, payload: unit.bytes)
+                            metrics.record(nativeAccepted: status == 0)
+                            if status != 0 { previousFailure = true }
+                        }
+                    } catch {
+                        assembler.reset()
+                        pictures?.reset()
+                        previousFailure = true
+                        metrics.record(nativeAccepted: false)
+                    }
+                    let finished = DispatchTime.now().uptimeNanoseconds
+                    if finished >= operationStart {
+                        metrics.recordProcessing(finished - operationStart)
+                    }
                 }
             }
+            native.close()
         }
     }
 
@@ -89,29 +132,29 @@ public final class VideoPacketPublisher: @unchecked Sendable {
             pendingGap = true
             return false
         }
-        let packet = Packet(data: bytes, timestamp: timestamp, gap: pendingGap,
-                            serial: acceptedSerial &+ 1)
-        switch continuation.yield(packet) {
-        case .enqueued:
-            counts.queued &+= 1
-            acceptedSerial &+= 1
-            pendingGap = false
-        case .dropped:
-            // An older chunk was evicted. The following accepted chunk must
-            // signal discontinuity because the H.264 decoder needs resync.
-            counts.queued &+= 1
-            acceptedSerial &+= 1
-            counts.overwritten &+= 1
-            pendingGap = true
-        case .terminated:
-            counts.rejected &+= 1
-            pendingGap = true
-            return false
-        @unknown default:
+        guard let nativeQueue else {
             counts.rejected &+= 1
             pendingGap = true
             return false
         }
+        let now = DispatchTime.now().uptimeNanoseconds
+        var packed = Data(capacity: 8 + bytes.count)
+        var little = timestamp.littleEndian
+        withUnsafeBytes(of: &little) { packed.append(contentsOf: $0) }
+        packed.append(bytes)
+        let work = NativeWorkQueue.Work(
+            traceID: acceptedSerial &+ 1, receivedNanoseconds: now,
+            deadlineNanoseconds: now > UInt64.max - 500_000_000 ? UInt64.max : now + 500_000_000,
+            kind: pendingGap ? 1 : 0, priority: .optional, payload: packed)
+        guard nativeQueue.push(work, at: now) == .accepted else {
+            counts.rejected &+= 1
+            pendingGap = true
+            return false
+        }
+        counts.queued &+= 1
+        acceptedSerial &+= 1
+        pendingGap = false
+        _ = continuation.yield(())
         lastReceived = timestamp
         return true
     }
@@ -130,6 +173,11 @@ public final class VideoPacketPublisher: @unchecked Sendable {
         let native = metrics.snapshot()
         result.forwarded = native.forwarded
         result.nativeRejected = native.rejected
+        result.accessUnits = native.accessUnits
+        result.assemblyFailures = native.assemblyFailures
+        result.queueP95Nanoseconds = native.queueP95
+        result.processingP95Nanoseconds = native.processingP95
+        result.expired = nativeQueue?.report()?.expired ?? 0
         return result
     }
 
@@ -153,6 +201,10 @@ private final class VideoPacketMetrics: @unchecked Sendable {
     private let lock = NSLock()
     private var forwarded: UInt64 = 0
     private var rejected: UInt64 = 0
+    private var accessUnits: UInt64 = 0
+    private var assemblyFailures: UInt64 = 0
+    private let queueLatency = NativeRuntimeMetrics(deadlineNanoseconds: 100_000_000)
+    private let processingLatency = NativeRuntimeMetrics(deadlineNanoseconds: 50_000_000)
 
     func record(nativeAccepted: Bool) {
         lock.lock()
@@ -160,9 +212,31 @@ private final class VideoPacketMetrics: @unchecked Sendable {
         lock.unlock()
     }
 
-    func snapshot() -> (forwarded: UInt64, rejected: UInt64) {
+    func recordAccessUnit() {
         lock.lock()
-        let result = (forwarded, rejected)
+        accessUnits &+= 1
+        lock.unlock()
+    }
+    func recordAssemblyFailure() {
+        lock.lock()
+        assemblyFailures &+= 1
+        lock.unlock()
+    }
+
+    func recordQueueWait(_ nanoseconds: UInt64) {
+        _ = queueLatency?.record(nanoseconds)
+    }
+    func recordProcessing(_ nanoseconds: UInt64) {
+        _ = processingLatency?.record(nanoseconds)
+    }
+
+    func snapshot() -> (forwarded: UInt64, rejected: UInt64,
+                        accessUnits: UInt64, assemblyFailures: UInt64,
+                        queueP95: UInt64, processingP95: UInt64) {
+        lock.lock()
+        let result = (forwarded, rejected, accessUnits, assemblyFailures,
+                      queueLatency?.report()?.p95_upper_ns ?? 0,
+                      processingLatency?.report()?.p95_upper_ns ?? 0)
         lock.unlock()
         return result
     }

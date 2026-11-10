@@ -88,3 +88,11 @@
 - Added P2 CLI and negative tests without enabling live flight or unverified hardware behavior.
 
 - Added trusted optional-worker lifecycle supervision with explicit quarantine and operator reset.
+
+## C++ runtime and video strengthening
+
+- Added native H.264 access-unit assembler with AVCC output, SPS/PPS and IDR resynchronization.
+- Added bounded, prioritized/deadline-aware C++ observation queue and concurrency tests.
+- Integrated native queue with DJI video ingress, CoreMedia samples, VideoToolbox decoding and diagnostics.
+- Added monotonic control cadence with bounded outstanding ticks and measured actor delivery.
+- Added real encoded H.264 randomized fragmentation regression and retained all actuation interlocks.
