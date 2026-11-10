@@ -82,8 +82,8 @@ extension DashboardView {
                     .font(.caption).foregroundStyle(.secondary)
             }
             if let clock = model.controlCadence?.diagnostic() {
-                if let latency = clock.latency, latency.samples > 0 {
-                    Text("Control delivery p95 (upper bound): \(Double(latency.p95_upper_ns) / 1_000_000, specifier: "%.2f") ms; \(clock.missed) coalesced ticks")
+                if clock.samples > 0 {
+                    Text("Control delivery p95 (upper bound): \(Double(clock.p95UpperNanoseconds) / 1_000_000, specifier: "%.2f") ms; \(clock.missed) coalesced ticks")
                         .font(.caption).foregroundStyle(.secondary)
                 }
             }

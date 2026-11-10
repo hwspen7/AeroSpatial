@@ -55,11 +55,19 @@ final class ControlCadence: @unchecked Sendable {
         source?.cancel()
     }
 
-    func diagnostic() -> (missed: UInt64, latency: ASRuntimeReport?) {
+    struct Diagnostic {
+        let missed: UInt64
+        let samples: UInt64
+        let p95UpperNanoseconds: UInt64
+    }
+
+    func diagnostic() -> Diagnostic {
         mutex.lock()
         let count = missed
         mutex.unlock()
-        return (count, jitter?.report())
+        let report = jitter?.report()
+        return Diagnostic(missed: count, samples: report?.samples ?? 0,
+                          p95UpperNanoseconds: report?.p95_upper_ns ?? 0)
     }
     deinit { stop() }
 }
