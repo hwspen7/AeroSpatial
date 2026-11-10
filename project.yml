@@ -8,7 +8,9 @@ settings:
     SWIFT_VERSION: "5.9"
     IPHONEOS_DEPLOYMENT_TARGET: "17.0"
     TARGETED_DEVICE_FAMILY: "1"
-    ENABLE_USER_SCRIPT_SANDBOXING: "YES"
+    # CocoaPods embeds the DJI V4 binary framework with an rsync script.
+    # Xcode 16.4 script sandboxing prevents copying its nested resource bundles.
+    ENABLE_USER_SCRIPT_SANDBOXING: "NO"
 packages:
   AeroSpatialCore:
     path: .
