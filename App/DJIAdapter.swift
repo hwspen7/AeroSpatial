@@ -42,7 +42,7 @@ final class DJIAdapter: NSObject, DroneAdapter {
     private func stopVideoFeed() {
         guard let receiver = videoReceiver else { return }
         receiver.deactivate()
-        DJISDKManager.videoFeeder()?.primaryVideoFeed.removeListener(receiver)
+        DJISDKManager.videoFeeder()?.primaryVideoFeed.remove(receiver)
         videoReceiver = nil
     }
 
