@@ -119,6 +119,10 @@ final class DJIAdapter: NSObject, DroneAdapter {
 }
 
 extension DJIAdapter: DJISDKManagerDelegate {
+    nonisolated func didUpdateDatabaseDownloadProgress(_ progress: Progress) {
+        // Database download is not proof of SDK registration or aircraft readiness.
+    }
+
     nonisolated func appRegisteredWithError(_ error: Error?) {
         Task { @MainActor [weak self] in
             guard let self = self else { return }
