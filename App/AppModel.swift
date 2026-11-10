@@ -1,4 +1,6 @@
 import Foundation
+import CoreMedia
+import CoreVideo
 import Combine
 import AeroSpatialCore
 
@@ -16,6 +18,7 @@ final class AppModel: ObservableObject {
     @Published var recording = false
     @Published var latestSession: URL?
     @Published var shareableSession: URL?
+    @Published var deviceDiagnosticsURL: URL?
     @Published var location: GeoPoint?
     @Published var phoneHeading: Double?
     @Published var relativePosition: RelativePosition?
@@ -53,6 +56,7 @@ final class AppModel: ObservableObject {
     lazy var ingressPublisher = spatialBus.map { SpatialIngressPublisher(bus: $0) }
     var videoPacketPublisher: VideoPacketPublisher?
     let videoDecoder = H264VideoDecodePipeline()
+    let decodedFrameEvidence = DecodedFrameEvidence()
     var tracking = HeadTrackingController()
     let runtimeSupervisor = SafetySupervisor()
     let controlLatency = NativeRuntimeMetrics(deadlineNanoseconds: 5_000_000)
@@ -67,6 +71,15 @@ final class AppModel: ObservableObject {
     var started = false
 
     init() {
+        // The model does not claim frames are georeferenced or carry camera PTS.
+        // Its first live decoded-frame consumer is a bounded metadata monitor.
+        videoDecoder.onDecodedFrame = { [decodedFrameEvidence] pixels, timestamp in
+            let time = timestamp.convertScale(1_000_000_000, method: .default)
+            let stamp: UInt64 = time.isValid && time.value > 0 ? UInt64(time.value) : 0
+            _ = decodedFrameEvidence.record(width: CVPixelBufferGetWidth(pixels),
+                height: CVPixelBufferGetHeight(pixels), receivedAtNanoseconds: stamp,
+                decodedAtNanoseconds: DispatchTime.now().uptimeNanoseconds)
+        }
         motion.onSample = { [weak self] sample in
             guard let self = self else { return }
             self.demoInputEnabled = false
@@ -165,6 +178,7 @@ final class AppModel: ObservableObject {
     func configureAdapter() {
         videoPacketPublisher?.close()
         videoDecoder.markDiscontinuity()
+        decodedFrameEvidence.reset()
         videoPacketPublisher = mode == .dji ? spatialBus.map { bus in
             VideoPacketPublisher(bus: bus,
                 onAccessUnit: { [videoDecoder] unit, timestamp, _ in

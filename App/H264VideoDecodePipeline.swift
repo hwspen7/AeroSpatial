@@ -114,6 +114,12 @@ final class H264VideoDecodePipeline: @unchecked Sendable {
 
     /// Validates SPS/PPS using CoreMedia and obtains dimensions from the stream.
     private func makeFormat(sps: Data, pps: Data) throws -> CMFormatDescription {
+        // CoreMedia requires nonempty parameter sets; never force-unwrap an
+        // invalid stream's empty Data buffer.
+        guard !sps.isEmpty, !pps.isEmpty,
+              sps.count <= 2 * 1024 * 1024, pps.count <= 2 * 1024 * 1024 else {
+            throw Failure.missingFormat
+        }
         var description: CMFormatDescription?
         let status = sps.withUnsafeBytes { sb in
             pps.withUnsafeBytes { pb in

@@ -1,6 +1,9 @@
-name: DJI SDK iOS integration compilation (manual)
+name: DJI SDK iOS integration compilation
 
 on:
+  push:
+    branches: [main]
+  pull_request:
   workflow_dispatch:
 
 permissions:
@@ -14,8 +17,9 @@ jobs:
       - uses: actions/checkout@v4
       - name: Install project and dependency tooling
         run: brew install xcodegen cocoapods
-      - name: Generate iOS app and resolve DJI SDK V4 dependency
+      - name: Validate iOS app configuration
         run: |
+          plutil -lint App/Info.plist
           xcodegen generate
           pod install --repo-update
       - name: Compile the DJI-linked application without signing

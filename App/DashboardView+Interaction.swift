@@ -102,10 +102,26 @@ extension DashboardView {
                     .font(.caption).foregroundStyle(.secondary)
                 let decoder = model.videoDecoder.snapshot()
                 Text("Video decode: \(decoder.submitted) submitted, \(decoder.decoded) decoded, \(decoder.rejected) failed, \(decoder.queueDropped) queued drops")
+                let frames = model.decodedFrameEvidence.snapshot()
+                Text("Decoded frame evidence: \(frames.accepted) accepted, \(frames.invalid) invalid, \(frames.outOfOrder) out of order, \(frames.stale) stale")
+                    .font(.caption).foregroundStyle(.secondary)
+                if frames.accepted > 0 {
+                    Text("Decoded resolution: \(frames.width)×\(frames.height); maximum host receipt-to-decode age: \(Double(frames.maximumReceiptToDecodeNanoseconds) / 1_000_000, specifier: "%.1f") ms (not camera latency)")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
                     .font(.caption).foregroundStyle(.secondary)
             }
             Text("Device thermal level: \(ProcessInfo.processInfo.thermalState.rawValue)")
                 .font(.caption).foregroundStyle(.secondary)
+            Button("Prepare device diagnostic summary") { model.prepareDeviceDiagnosticSummary() }
+                .buttonStyle(.bordered)
+            if let report = model.deviceDiagnosticsURL {
+                ShareLink(item: report) {
+                    Label("Share diagnostic summary", systemImage: "square.and.arrow.up")
+                }
+                Text("Summary contains counters and device state only, not GPS, media, or the DJI app key.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
             Label(model.commandGate.pending == nil ? "No command in flight" : "Awaiting gimbal callback",
                   systemImage: model.commandGate.pending == nil ? "checkmark.shield" : "clock.arrow.circlepath")
                 .font(.caption).foregroundStyle(.secondary)

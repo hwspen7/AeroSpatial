@@ -58,6 +58,12 @@ final class DJIAdapter: NSObject, DroneAdapter {
         pollTimer?.invalidate()
         pollTimer = nil
         snapshot.connected = false
+        snapshot.flying = false
+        snapshot.position = nil
+        snapshot.altitudeMeters = nil
+        snapshot.headingDegrees = nil
+        snapshot.gimbalPitchDegrees = nil
+        snapshot.batteryPercent = nil
         pendingPitchCommand = false
         onSnapshot?(snapshot)
         // Aircraft stays under physical remote control. This does not disconnect the remote.
@@ -98,8 +104,16 @@ final class DJIAdapter: NSObject, DroneAdapter {
     private func refreshTelemetry() {
         let connected = (DJISDKManager.product() as? DJIAircraft)?.isConnected ?? false
         guard connected != snapshot.connected else { return }
-        snapshot.connected = connected
-        onSnapshot?(snapshot)
+        if !connected {
+            // A missed SDK disconnect callback must not leave the old video feed
+            // or device capability evidence alive.
+            disconnect()
+            onStatus?("Device link lost during telemetry polling. Camera and controls stopped.")
+        } else {
+            // A new SDK productConnected event must establish the exact model
+            // and the delegates. Polling alone cannot authorize a device.
+            onStatus?("DJI link returned; waiting for validated product callback.")
+        }
         // Never mark stale telemetry as fresh merely because a connection was polled.
     }
 }
