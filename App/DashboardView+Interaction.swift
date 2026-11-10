@@ -97,16 +97,11 @@ extension DashboardView {
                     .font(.caption).foregroundStyle(.secondary)
             }
             if let video = model.videoPacketPublisher?.snapshot() {
-                Text("H.264 chunks: \(video.queued) queued, \(video.overwritten) overwritten, " +
-                     "\(video.rejected) rejected, \(video.expired) expired, " +
-                     "\(video.forwarded) NAL units, \(video.accessUnits) access units")
-                Text("Video queue p95: \(Double(video.queueP95Nanoseconds) / 1_000_000, specifier: "%.2f") ms; " +
-                     "processing p95: \(Double(video.processingP95Nanoseconds) / 1_000_000, specifier: "%.2f") ms")
+                Text("H.264 chunks: \(video.queued) queued, \(video.overwritten) overwritten, \(video.rejected) rejected, \(video.expired) expired, \(video.forwarded) NAL units, \(video.accessUnits) access units")
+                Text("Video queue p95: \(Double(video.queueP95Nanoseconds) / 1_000_000, specifier: "%.2f") ms; processing p95: \(Double(video.processingP95Nanoseconds) / 1_000_000, specifier: "%.2f") ms")
                     .font(.caption).foregroundStyle(.secondary)
                 let decoder = model.videoDecoder.snapshot()
-                Text("Video decode: \(decoder.submitted) submitted, \(decoder.decoded) decoded, " +
-                     "\(decoder.rejected) failed, \(decoder.queueDropped) queued drops")
-                    .font(.caption).foregroundStyle(.secondary)
+                Text("Video decode: \(decoder.submitted) submitted, \(decoder.decoded) decoded, \(decoder.rejected) failed, \(decoder.queueDropped) queued drops")
                     .font(.caption).foregroundStyle(.secondary)
             }
             Text("Device thermal level: \(ProcessInfo.processInfo.thermalState.rawValue)")
