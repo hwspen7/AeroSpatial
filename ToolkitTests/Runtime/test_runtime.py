@@ -5,7 +5,7 @@ from pathlib import Path
 from aerospatial_tools.algorithm import load_manifests
 from aerospatial_tools.runtime import AlgorithmRuntime
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 
 
 def registry():

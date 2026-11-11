@@ -9,7 +9,7 @@ from aerospatial_tools.algorithm import AlgorithmManifest, AlgorithmRegistry, lo
 from aerospatial_tools.qos import ComputeBudget, ComputePolicy
 from aerospatial_tools.workload import WorkloadProfile, replay
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 
 
 class AlgorithmTests(unittest.TestCase):

@@ -4,7 +4,7 @@ import XCTest
 final class ModelDeploymentTests: XCTestCase {
     func testSharedContractAndConservativeSelection() throws {
         let url = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
-            .deletingLastPathComponent().appendingPathComponent("Fixtures/models.json")
+            .deletingLastPathComponent().deletingLastPathComponent().appendingPathComponent("Fixtures/models.json")
         let models = try JSONDecoder().decode([ModelDeployment].self, from: Data(contentsOf: url))
         XCTAssertEqual(models.count, 1)
         var catalog = ModelDeploymentCatalog()
@@ -21,7 +21,7 @@ final class ModelDeploymentTests: XCTestCase {
 
     func testRejectUnsafeFilenameAndDigest() throws {
         let url = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
-            .deletingLastPathComponent().appendingPathComponent("Fixtures/models.json")
+            .deletingLastPathComponent().deletingLastPathComponent().appendingPathComponent("Fixtures/models.json")
         var object = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [[String: Any]])[0]
         object["relativePath"] = "../evil.bin"
         let unsafe = try JSONDecoder().decode(ModelDeployment.self, from: JSONSerialization.data(withJSONObject: object))

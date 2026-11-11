@@ -5,7 +5,7 @@ import unittest
 
 from aerospatial_tools.trace_protocol import inspect_trace
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 
 
 class TraceProtocolTests(unittest.TestCase):

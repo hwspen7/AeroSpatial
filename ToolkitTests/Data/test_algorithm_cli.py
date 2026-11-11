@@ -6,7 +6,7 @@ import unittest
 
 from aerospatial_tools.cli import main
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 
 
 class AlgorithmCliTests(unittest.TestCase):

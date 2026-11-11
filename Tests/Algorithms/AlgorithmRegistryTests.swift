@@ -35,7 +35,7 @@ final class AlgorithmRegistryTests: XCTestCase {
 
     func testFixtureRoundTrip() throws {
         let url = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
-            .deletingLastPathComponent().appendingPathComponent("Fixtures/algorithms.json")
+            .deletingLastPathComponent().deletingLastPathComponent().appendingPathComponent("Fixtures/algorithms.json")
         let data = try Data(contentsOf: url)
         let manifests = try JSONDecoder().decode([AlgorithmManifest].self, from: data)
         var registry = AlgorithmRegistry()
