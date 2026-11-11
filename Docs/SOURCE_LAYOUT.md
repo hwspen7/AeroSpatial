@@ -1,6 +1,6 @@
 # Source layout
 
-Code is organized by technical responsibility, not by delivery phase. These are directory-only moves: implementation and test bodies are unchanged.
+Code is organized by technical responsibility, not by delivery phase. Implementation files are moved without changing their source code. Seven relocated test files update repository-root fixture lookup paths to keep CI working.
 
 - `App/Application`, `App/ViewModels`, `App/Views`, `App/Devices`, `App/Video`, `App/Controls`, `App/Services` contain the iOS entry point and adapters. The app Info.plist stays in App/ for XcodeGen.
 - `Core/Algorithms`, `Core/Devices`, `Core/Events`, `Core/Geometry`, `Core/Interop`, `Core/Safety`, `Core/Storage`, `Core/Timing`, `Core/Tracking`, `Core/Video` group Swift Package Manager sources.
