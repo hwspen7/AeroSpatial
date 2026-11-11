@@ -4,9 +4,9 @@ AeroSpatial's optional-algorithm foundation is deliberately separate from aircra
 
 ## C++ high-frequency compute
 
-`Kernel/qos.cpp` implements a fixed-table, mutex-synchronized token admission governor. Only streams 3 (video), 4 (perception), and 5 (diagnostic) are accepted. Head motion, telemetry, and aircraft failsafes cannot be throttled through this API. Admission uses bounded burst capacity, monotonic nanosecond timestamps, per-stream refill rates and reported backlog pressure. A rejected optional task is not enqueued or retried. Configuration, invalid timestamps, non-finite estimates, concurrent admission and overload recovery are tested.
+`Kernel/src/Runtime/qos.cpp` implements a fixed-table, mutex-synchronized token admission governor. Only streams 3 (video), 4 (perception), and 5 (diagnostic) are accepted. Head motion, telemetry, and aircraft failsafes cannot be throttled through this API. Admission uses bounded burst capacity, monotonic nanosecond timestamps, per-stream refill rates and reported backlog pressure. A rejected optional task is not enqueued or retried. Configuration, invalid timestamps, non-finite estimates, concurrent admission and overload recovery are tested.
 
-`Kernel/camera.cpp` computes an ideal pinhole camera ray and the ray intersection with a **caller-supplied horizontal ENU reference plane**. Inputs are undistorted pixels using the exact image/crop intrinsics and a verified optical-camera-to-ENU quaternion, with a consistent vertical datum. This is not depth estimation, a map-based geolocation claim, terrain intersection or automatic camera calibration. Native numeric results are available via the Swift `CameraRay` interface.
+`Kernel/src/Geometry/camera.cpp` computes an ideal pinhole camera ray and the ray intersection with a **caller-supplied horizontal ENU reference plane**. Inputs are undistorted pixels using the exact image/crop intrinsics and a verified optical-camera-to-ENU quaternion, with a consistent vertical datum. This is not depth estimation, a map-based geolocation claim, terrain intersection or automatic camera calibration. Native numeric results are available via the Swift `CameraRay` interface.
 
 ## Algorithm manifest and dependency planning
 

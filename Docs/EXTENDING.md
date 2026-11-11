@@ -12,7 +12,7 @@ AeroSpatial intentionally separates real-time device control, portable numerical
 
 ## C++ numerical extensions
 
-Add a single-purpose `.cpp` file under `Kernel` and add its declarations to `include/aerospatial_native.h`. Export only plain C-compatible structs, arrays and error codes. Include the source in `Kernel/CMakeLists.txt`, add a corresponding `NativeTests/test_*.cpp`, and use a thin checked Swift wrapper. No C++ exceptions or owned pointers can cross the C ABI.
+Add a single-purpose `.cpp` file under the relevant `Kernel/src/<Subsystem>/` directory and add its declarations to `include/aerospatial_native.h`. Export only plain C-compatible structs, arrays and error codes. Include the source in `Kernel/CMakeLists.txt`, add a corresponding `NativeTests/<Subsystem>/test_*.cpp`, and use a thin checked Swift wrapper. No C++ exceptions or owned pointers can cross the C ABI.
 
 The C++ library is built both through Swift Package Manager and standalone CMake, so each new function must compile without DJI or Apple-only headers.
 

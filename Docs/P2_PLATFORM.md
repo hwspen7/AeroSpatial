@@ -7,7 +7,7 @@ local artifact governance, repeatable experiments, and integration scaffolding.
 
 ## Native, device-neutral algorithms
 
-- `Kernel/adaptive.cpp` and `include/aerospatial_adaptive.h` implement bounded,
+- `Kernel/src/Estimation/adaptive.cpp` and `include/aerospatial_adaptive.h` implement bounded,
   deterministic admission-quality decisions for **optional** video/perception
   only. Quality 0..3 is a recommendation; an application must explicitly apply
   it to its decoder or inference scheduler. Safety and actuator paths do not use it.

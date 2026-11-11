@@ -62,7 +62,7 @@ probing, and a 24-hour device soak. These cannot be passed through simulation.
 `DJIEncodedVideoReceiver` registers a serial `DJIVideoFeedListener` callback
 only when the exact Mavic Air 2 model is observed by MSDK V4. The callback
 passes bounded encoded fragments to `VideoPacketPublisher` without updating
-SwiftUI. `Kernel/h264.cpp` reassembles fragmented Annex-B start codes into NAL
+SwiftUI. `Kernel/src/Video/h264.cpp` reassembles fragmented Annex-B start codes into NAL
 units. All timestamps are SDK callback receipt-time estimates and carry
 `clockEstimated`/`lowConfidence` quality flags. Disconnection unregisters the
 listener and marks stream discontinuity. See `Docs/P0_ACCEPTANCE.md` for the
