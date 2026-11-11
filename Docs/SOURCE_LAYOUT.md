@@ -7,7 +7,11 @@ Code is organized by technical responsibility, not by delivery phase. Implementa
 - `Tests/` mirrors the functional areas of Core.
 - `ToolkitTests/` separates Python regression, numerical, integration, runtime and data tests. Each child folder is an importable package so unittest discovery descends into it.
 
-Paths deliberately kept stable in this pass: `Kernel/` and `NativeTests/` (the CMake and C++ local include contract), `Toolkit/aerospatial_tools/` (public Python module import names), `Docs/` (existing Markdown deep links), all fixtures, and the root build manifests. They can be rearranged in a later reviewed pass with explicit path migrations.
+- `Kernel/src/` separates C++ native bus, geometry, estimation, runtime and video implementation. `Kernel/Tools/` contains probe and benchmarking executables. `Kernel/include/` preserves the stable public C ABI headers.
+- `NativeTests/` groups C++ native tests by subsystem and keeps the shared assertion header in `NativeTests/Common/`. CMake maps each test to its new source location.
+- `Package.swift` excludes `Kernel/Tools/` and explicitly adds the native target root to header search paths to preserve legacy `#include "include/..."` directives after relocation. CMake configures the equivalent private include paths.
+- Paths deliberately kept stable: `Toolkit/aerospatial_tools/` (public Python module names), `Docs/` (Markdown deep links), all fixtures, and the root build manifests.
+
 
 ## Validation
 
