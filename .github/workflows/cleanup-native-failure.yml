@@ -1,0 +1,29 @@
+name: One-time cleanup of fixed native test failure
+on:
+  pull_request:
+    types: [synchronize]
+permissions:
+  contents: read
+  actions: write
+jobs:
+  cleanup:
+    if: github.event.pull_request.number == 2 && github.head_ref == 'refactor/organized-source-layout' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Delete only the reviewed, fixed historical failure
+        env:
+          GH_TOKEN: ${ { github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          run_id=43381838435
+          route="repos/${GITHUB_REPOSITORY}/actions/runs/${run_id}"
+          outcome="$(gh api "$route" --jq .conclusion)"
+          revision="$(gh api "$route" --jq .head_sha)"
+          if [[ "$outcome" != failure ]] || [[ "$revision" != f5da5ef992c1408644a747480b011a0e1b14f845 ]]; then
+            echo "Unexpected run state; refusing to delete a different result"
+            exit 1
+          fi
+          gh api -X DELETE "$route"
+          echo "Removed the fixed historical failing run"
