@@ -3,32 +3,17 @@ project(AeroSpatialNative LANGUAGES CXX)
 include(CTest)
 find_package(Threads REQUIRED)
 set(NATIVE_ROOT "${CMAKE_CURRENT_LIST_DIR}")
-add_library(aerospatial_native STATIC
-    "${NATIVE_ROOT}/Geometry/geometry.cpp"
-    "${NATIVE_ROOT}/Geometry/orientation.cpp"
-    "${NATIVE_ROOT}/Geometry/filter.cpp"
-    "${NATIVE_ROOT}/Geometry/frames.cpp"
-    "${NATIVE_ROOT}/Geometry/slerp.cpp"
-    "${NATIVE_ROOT}/Geometry/transform.cpp"
-    "${NATIVE_ROOT}/Geometry/batch.cpp"
-    "${NATIVE_ROOT}/Geometry/wire.cpp"
-    "${NATIVE_ROOT}/Runtime/qos.cpp"
-    "${NATIVE_ROOT}/Geometry/camera.cpp"
-    "${NATIVE_ROOT}/Estimation/calibration.cpp"
-    "${NATIVE_ROOT}/Estimation/tracking.cpp"
-    "${NATIVE_ROOT}/Estimation/pose.cpp"
-    "${NATIVE_ROOT}/Estimation/inertial.cpp"
-    "${NATIVE_ROOT}/Runtime/runtime_metrics.cpp"
-    "${NATIVE_ROOT}/Video/h264.cpp"
-    "${NATIVE_ROOT}/Video/access_unit.cpp"
-    "${NATIVE_ROOT}/Runtime/work_queue.cpp"
-    "${NATIVE_ROOT}/Runtime/memory.cpp"
-    "${NATIVE_ROOT}/Runtime/executor.cpp"
-    "${NATIVE_ROOT}/Estimation/fusion.cpp"
-    "${NATIVE_ROOT}/Estimation/adaptive.cpp"
-    "${NATIVE_ROOT}/Bus/bus_core.cpp"
-    "${NATIVE_ROOT}/Bus/bus_consumer.cpp"
-    "${NATIVE_ROOT}/Bus/bus_lease.cpp")
+# Automatically discover each C++ implementation in approved subsystem folders.
+file(GLOB NATIVE_SOURCES CONFIGURE_DEPENDS
+    "${NATIVE_ROOT}/Bus/*.cpp"
+    "${NATIVE_ROOT}/Geometry/*.cpp"
+    "${NATIVE_ROOT}/Estimation/*.cpp"
+    "${NATIVE_ROOT}/Video/*.cpp"
+    "${NATIVE_ROOT}/Runtime/*.cpp")
+if(NOT NATIVE_SOURCES)
+    message(FATAL_ERROR "No native C++ implementation files were discovered")
+endif()
+add_library(aerospatial_native STATIC ${NATIVE_SOURCES})
 target_include_directories(aerospatial_native PUBLIC "${NATIVE_ROOT}/include" PRIVATE "${NATIVE_ROOT}")
 target_compile_features(aerospatial_native PUBLIC cxx_std_17)
 target_link_libraries(aerospatial_native PUBLIC Threads::Threads)
@@ -48,21 +33,26 @@ aerospatial_add_tool(aerospatial-qos-probe qos_probe.cpp)
 if(BUILD_TESTING)
     target_compile_definitions(aerospatial_native PRIVATE AEROSPATIAL_TEST_HOOKS)
     set(NATIVE_TEST_ROOT "${NATIVE_ROOT}/../NativeTests")
-    set(NATIVE_TEST_GROUP_Bus bus bus_concurrency bus_resources bus_budget_race bus_faults bus_soak)
-    set(NATIVE_TEST_GROUP_Geometry geometry orientation filter frames slerp transform batch wire camera)
-    set(NATIVE_TEST_GROUP_Estimation calibration tracking estimation adaptive fusion)
-    set(NATIVE_TEST_GROUP_Video h264 access_unit h264_real access_dual)
-    set(NATIVE_TEST_GROUP_Runtime qos runtime_metrics work_queue memory executor work_lease)
-    foreach(group IN ITEMS Bus Geometry Estimation Video Runtime)
-        foreach(name IN LISTS NATIVE_TEST_GROUP_${group})
-            add_executable(test_${name} "${NATIVE_TEST_ROOT}/${group}/test_${name}.cpp")
-            target_include_directories(test_${name} PRIVATE "${NATIVE_TEST_ROOT}/Common" "${NATIVE_TEST_ROOT}")
-            target_link_libraries(test_${name} PRIVATE aerospatial_native)
-            if(name STREQUAL "h264_real")
-                target_compile_definitions(test_${name} PRIVATE AEROSPATIAL_FIXTURE_DIR="${NATIVE_ROOT}/../Fixtures")
-            endif()
-            add_test(NAME native_${name} COMMAND test_${name})
-        endforeach()
+    file(GLOB NATIVE_TEST_SOURCES CONFIGURE_DEPENDS
+         "${NATIVE_TEST_ROOT}/*/test_*.cpp")
+    if(NOT NATIVE_TEST_SOURCES)
+        message(FATAL_ERROR "No native regression tests were discovered")
+    endif()
+    foreach(source IN LISTS NATIVE_TEST_SOURCES)
+        get_filename_component(stem "${source}" NAME_WE)
+        string(REGEX REPLACE "^test_" "" name "${stem}")
+        if(TARGET test_${name})
+            message(FATAL_ERROR "Duplicate native test target: test_${name}")
+        endif()
+        add_executable(test_${name} "${source}")
+        target_include_directories(test_${name} PRIVATE
+            "${NATIVE_TEST_ROOT}/Common" "${NATIVE_TEST_ROOT}")
+        target_link_libraries(test_${name} PRIVATE aerospatial_native)
+        if(name STREQUAL "h264_real")
+            target_compile_definitions(test_${name} PRIVATE
+                AEROSPATIAL_FIXTURE_DIR="${NATIVE_ROOT}/../Fixtures")
+        endif()
+        add_test(NAME native_${name} COMMAND test_${name})
     endforeach()
 endif()
 
@@ -84,4 +74,24 @@ endif()
 option(AEROSPATIAL_BUILD_WORK_BENCHMARK "Build bounded native task queue benchmark" OFF)
 if(AEROSPATIAL_BUILD_WORK_BENCHMARK)
     aerospatial_add_tool(aerospatial-work-bench work_benchmark.cpp)
+endif()
+
+option(AEROSPATIAL_BUILD_SOAK "Build bounded native lifecycle soak executable" OFF)
+if(AEROSPATIAL_BUILD_SOAK)
+    aerospatial_add_tool(aerospatial-soak soak_runtime.cpp)
+endif()
+option(AEROSPATIAL_BUILD_FUZZ_SMOKE "Build deterministic malformed-input fuzz smoke test" OFF)
+if(AEROSPATIAL_BUILD_FUZZ_SMOKE)
+    aerospatial_add_tool(aerospatial-fuzz-smoke fuzz_parsers.cpp)
+    target_compile_definitions(aerospatial-fuzz-smoke PRIVATE AS_FUZZ_STANDALONE)
+endif()
+option(AEROSPATIAL_BUILD_LIBFUZZER "Build instrumented libFuzzer target" OFF)
+if(AEROSPATIAL_BUILD_LIBFUZZER)
+    if(NOT CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+        message(FATAL_ERROR "LibFuzzer target requires Clang")
+    endif()
+    add_executable(aerospatial-fuzz "${NATIVE_ROOT}/Tools/fuzz_parsers.cpp")
+    target_compile_options(aerospatial-fuzz PRIVATE -fsanitize=fuzzer)
+    target_link_options(aerospatial-fuzz PRIVATE -fsanitize=fuzzer)
+    target_link_libraries(aerospatial-fuzz PRIVATE aerospatial_native)
 endif()

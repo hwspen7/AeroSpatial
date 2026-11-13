@@ -37,25 +37,45 @@ def check() -> list[str]:
             issues.append(f"Overcrowded folder: {folder} has {count} files (limit {maximum})")
 
     cmake = (ROOT / "Kernel/CMakeLists.txt").read_text(encoding="utf-8")
-    native_sources = re.findall(r'\$\{NATIVE_ROOT\}/([A-Za-z]+/[A-Za-z0-9_]+\.cpp)', cmake)
-    if len(native_sources) != 25 or len(set(native_sources)) != 25:
-        issues.append("Native CMake source enumeration changed unexpectedly")
-    for source in native_sources:
-        if f"Kernel/{source}" not in files:
-            issues.append(f"Missing CMake source: Kernel/{source}")
+    # Validate automatic source discovery, complete subsystem coverage,
+    # duplicate test targets, and every tool without fixed file counts.
+    source_dirs = set(re.findall(
+        r'"\$\{NATIVE_ROOT\}/([A-Za-z]+)/\*\.cpp"', cmake))
+    actual_sources = [
+        path for path in paths
+        if re.fullmatch(r"Kernel/[A-Za-z]+/[A-Za-z0-9_]+\.cpp", path)
+        and not path.startswith("Kernel/Tools/")
+    ]
+    actual_dirs = {path.split("/")[1] for path in actual_sources}
+    if not actual_sources or source_dirs != actual_dirs:
+        issues.append(f"CMake native glob mismatch: declared {sorted(source_dirs)}, "
+                      f"found {sorted(actual_dirs)}")
+    if "file(GLOB NATIVE_SOURCES CONFIGURE_DEPENDS" not in cmake:
+        issues.append("Native CMake must discover newly added sources")
+    test_glob = '"${NATIVE_TEST_ROOT}/*/test_*.cpp"'
+    if test_glob not in cmake or "file(GLOB NATIVE_TEST_SOURCES CONFIGURE_DEPENDS" not in cmake:
+        issues.append("Native CMake must discover newly added tests")
+    native_tests = [
+        path for path in paths
+        if re.fullmatch(r"NativeTests/[A-Za-z]+/test_[a-z0-9_]+\.cpp", path)
+    ]
+    test_names = [Path(path).stem for path in native_tests]
+    if not native_tests or len(test_names) != len(set(test_names)):
+        issues.append("No native tests or duplicate native test target names")
+    if "NativeTests/Common/test_common.h" not in files:
+        issues.append("Native test assertions header is missing")
 
-    groups = re.findall(r'set\(NATIVE_TEST_GROUP_([A-Za-z]+)\s+([^)]*)\)', cmake)
-    tests = [f"NativeTests/{group}/test_{name}.cpp" for group, values in groups for name in values.split()]
-    if len(tests) != 30 or len(set(tests)) != 30:
-        issues.append("Native CMake test enumeration changed unexpectedly")
-    for name in tests:
-        if name not in files:
-            issues.append(f"Missing CMake test: {name}")
-
-    for name in ("probe", "wire_probe", "qos_probe",
-                 "benchmark", "bus_benchmark", "estimation_benchmark", "work_benchmark"):
-        if f"Kernel/Tools/{name}.cpp" not in files:
-            issues.append(f"Missing native tool: Kernel/Tools/{name}.cpp")
+    declared_tools = set(re.findall(
+        r'aerospatial_add_tool\([\w-]+\s+([a-z_]+\.cpp)\)', cmake))
+    if 'add_executable(aerospatial-fuzz "${NATIVE_ROOT}/Tools/fuzz_parsers.cpp")' in cmake:
+        declared_tools.add("fuzz_parsers.cpp")
+    actual_tools = {
+        Path(path).name for path in paths
+        if re.fullmatch(r"Kernel/Tools/[a-z_]+\.cpp", path)
+    }
+    if declared_tools != actual_tools:
+        issues.append(f"Native tool registration mismatch: declared "
+                      f"{sorted(declared_tools)}, found {sorted(actual_tools)}")
 
     root_package = ROOT / "aerospatial_tools"
     if not (ROOT / "pyproject.toml").is_file():
@@ -99,4 +119,4 @@ if __name__ == "__main__":
     if findings:
         print("\n".join(f"ERROR: {finding}" for finding in findings), file=sys.stderr)
         raise SystemExit(1)
-    print("Layout OK: max depth 2, bounded folders, 25 C++ sources, 30 native tests, and Markdown links verified.")
+    print("Layout OK: shallow folders, dynamic C++ registration, Python imports and Markdown links verified.")

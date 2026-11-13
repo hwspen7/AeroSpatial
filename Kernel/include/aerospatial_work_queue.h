@@ -35,6 +35,10 @@ typedef struct {
 /// Essential entries may evict optional entries; no essential entry is overwritten.
 ASWorkQueue *as_work_queue_create(size_t maximum_events, size_t maximum_bytes,
                                   size_t maximum_payload_bytes);
+struct ASResourceGovernor;
+ASWorkQueue *as_work_queue_create_budgeted(size_t maximum_events, size_t maximum_bytes,
+                                           size_t maximum_payload_bytes,
+                                           struct ASResourceGovernor *governor);
 void as_work_queue_destroy(ASWorkQueue *queue);
 void as_work_queue_close(ASWorkQueue *queue);
 ASWorkStatus as_work_queue_push(ASWorkQueue *queue, ASWorkHeader header,

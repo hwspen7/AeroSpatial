@@ -22,6 +22,17 @@ extern "C" ASBus *as_bus_create(const ASBusConfig *config) {
     try { return new ASBus(*config); } catch (...) { return nullptr; }
 }
 
+extern "C" ASBus *as_bus_create_budgeted(const ASBusConfig *config, ASResourceGovernor *g) {
+    if (!g || !config || !config->max_topics || config->max_topics > 64 ||
+        !config->max_subscribers_per_topic || config->max_subscribers_per_topic > 128)
+        return nullptr;
+    try {
+        auto *bus = new ASBus(*config, g);
+        if (!bus->governor) { delete bus; return nullptr; }
+        return bus;
+    } catch (...) { return nullptr; }
+}
+
 extern "C" void as_bus_destroy(ASBus *bus) {
     if (!bus) return;
     // Subscribers and fast publishers keep each topic alive after parent destruction.
@@ -45,8 +56,10 @@ extern "C" ASBusStatus as_bus_add_topic(ASBus *bus, ASBusTopicConfig config) {
     if (bus->topics.count(config.stream_id)) return ASBUS_INVALID;
     if (bus->topics.size() == bus->config.max_topics) return ASBUS_LIMIT_REACHED;
     try {
-        bus->topics.emplace(config.stream_id,
-                            std::make_shared<BusTopic>(config, bus->config.max_subscribers_per_topic, bus->budget));
+        auto topic = std::make_shared<BusTopic>(
+            config, bus->config.max_subscribers_per_topic, bus->budget, bus->governor);
+        if (bus->governor && !topic->governor) return ASBUS_LIMIT_REACHED;
+        bus->topics.emplace(config.stream_id, std::move(topic));
         return ASBUS_OK;
     } catch (...) { return ASBUS_LIMIT_REACHED; }
 }
@@ -97,8 +110,21 @@ ASBusStatus bus_publish_topic(const std::shared_ptr<BusTopic> &topic, ASBusHeade
     struct Reservation {
         BusBudget &budget;
         uint64_t bytes;
-        ~Reservation() { budget.release(bytes); }
+        ASResourcePermit *permit = nullptr;
+        ~Reservation() {
+            as_resource_permit_release(permit);
+            budget.release(bytes);
+        }
     } reservation{*topic->budget, static_cast<uint64_t>(payload_bytes)};
+    if (topic->governor && payload_bytes) {
+        reservation.permit = as_resource_permit_acquire(
+            topic->governor, AS_RESOURCE_BUS, payload_bytes);
+        if (!reservation.permit) {
+            ++topic->stats.rejected;
+            ++topic->stats.budget_rejected;
+            return ASBUS_MEMORY_BUDGET;
+        }
+    }
     try {
         auto event = std::make_shared<BusEvent>();
         event->budget = topic->budget;
@@ -117,6 +143,8 @@ ASBusStatus bus_publish_topic(const std::shared_ptr<BusTopic> &topic, ASBusHeade
         }
         // Transfer accounting only after every potentially throwing allocation.
         event->reserved_bytes = payload_bytes;
+        event->permit = reservation.permit;
+        reservation.permit = nullptr;
         reservation.bytes = 0;
         topic->slots[bus_slot(*topic, topic->next)] = std::move(event);
     } catch (...) {

@@ -1,15 +1,33 @@
 #include "include/aerospatial_work_queue.h"
+#include "include/aerospatial_runtime.h"
 #include <algorithm>
 #include <deque>
 #include <mutex>
+#include <memory>
 #include <new>
 #include <vector>
 
-struct WorkItem { ASWorkHeader header; std::vector<uint8_t> payload; uint64_t enqueued; };
-struct ASWorkLease { std::vector<uint8_t> bytes; };
+struct PermitRelease {
+    void operator()(ASResourcePermit *permit) const { as_resource_permit_release(permit); }
+};
+using Permit = std::unique_ptr<ASResourcePermit, PermitRelease>;
+struct WorkItem {
+    ASWorkHeader header{};
+    std::vector<uint8_t> payload;
+    uint64_t enqueued = 0;
+    Permit permit{};
+};
+struct ASWorkLease {
+    std::vector<uint8_t> bytes;
+    Permit permit{};
+};
 struct ASWorkQueue {
-    explicit ASWorkQueue(size_t count, size_t memory, size_t payload)
-      : max_events(count), max_bytes(memory), max_payload(payload) {}
+    explicit ASWorkQueue(size_t count, size_t memory, size_t payload,
+                         ASResourceGovernor *g = nullptr)
+      : max_events(count), max_bytes(memory), max_payload(payload),
+        governor(as_resource_governor_retain(g)) {}
+    ~ASWorkQueue() { as_resource_governor_destroy(governor); }
+    ASResourceGovernor *governor = nullptr;
     mutable std::mutex lock;
     const size_t max_events, max_bytes, max_payload;
     std::deque<WorkItem> essential, optional;
@@ -31,6 +49,14 @@ extern "C" ASWorkQueue *as_work_queue_create(size_t count, size_t bytes, size_t 
     if (!count || count > 65536 || !bytes || bytes > (512u << 20) ||
         !payload || payload > bytes || payload > (8u << 20)) return nullptr;
     return new (std::nothrow) ASWorkQueue(count, bytes, payload);
+}
+extern "C" ASWorkQueue *as_work_queue_create_budgeted(
+    size_t count, size_t bytes, size_t payload, ASResourceGovernor *g) {
+    if (!g || !count || count > 65536 || !bytes || bytes > (512u << 20) ||
+        !payload || payload > bytes || payload > (8u << 20)) return nullptr;
+    auto *q = new (std::nothrow) ASWorkQueue(count, bytes, payload, g);
+    if (q && !q->governor) { delete q; return nullptr; }
+    return q;
 }
 extern "C" void as_work_queue_destroy(ASWorkQueue *q) { delete q; }
 extern "C" void as_work_queue_close(ASWorkQueue *q) {
@@ -68,6 +94,11 @@ extern "C" ASWorkStatus as_work_queue_push(ASWorkQueue *q, ASWorkHeader h,
         }
     }
     if (is_full(*q, n)) { ++q->stats.rejected; return ASWQ_FULL; }
+    if (q->governor && n) {
+        item.permit.reset(as_resource_permit_acquire(
+            q->governor, AS_RESOURCE_WORK, n));
+        if (!item.permit) { ++q->stats.rejected; return ASWQ_FULL; }
+    }
     try {
         if (h.priority == ASWQ_ESSENTIAL) q->essential.push_back(std::move(item));
         else q->optional.push_back(std::move(item));
@@ -129,6 +160,7 @@ extern "C" ASWorkStatus as_work_queue_pop_lease(ASWorkQueue *q, uint64_t now,
         if (!owned) return ASWQ_FULL;
         *h = lane.front().header;
         owned->bytes = std::move(lane.front().payload);
+        owned->permit = std::move(lane.front().permit);
         const auto bytes = owned->bytes.size();
         q->stats.maximum_queue_wait_ns = std::max(q->stats.maximum_queue_wait_ns,
                                                    now - lane.front().enqueued);

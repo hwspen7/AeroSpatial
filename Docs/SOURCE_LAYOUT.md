@@ -22,7 +22,7 @@ Files are grouped by responsibility rather than by delivery phase.
 - `Package.swift` defines the Swift and C++ targets; `Kernel/CMakeLists.txt` enumerates native source and test paths.
 - `pyproject.toml` is the installable Python project's build definition. Install with `python -m pip install -e .` or an extras group such as `'.[vision,privacy]'`.
 - `PYTHONPATH=.` makes the Python tooling available from the repository root without installation.
-- `python Scripts/check-layout.py` checks depth, folder size and source-path contracts.
+- `python Scripts/check-layout.py` checks depth, folder size and dynamic C++ source/test registration. See [native runtime quality](Development/NATIVE_QUALITY.md) for budget, clock, ABI, Fuzzing, TSAN, latency and estimator contracts.
 - GitHub Actions runs Swift, C++, Python, iOS Simulator and DJI SDK build checks. Software CI cannot substitute for AirPods and Mavic Air 2 hardware acceptance.
 
 Do not create nested third-level folders or scatter files back into large flat source directories. Public ABI headers and import paths should only change through a separate compatibility-reviewed migration.

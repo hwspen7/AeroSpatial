@@ -2,6 +2,7 @@
 #define AEROSPATIAL_BUS_INTERNAL_H
 
 #include "aerospatial_bus.h"
+#include "aerospatial_runtime.h"
 #include <atomic>
 #include <cstdint>
 #include <memory>
@@ -39,7 +40,11 @@ struct BusEvent {
     std::vector<uint8_t> payload;
     std::shared_ptr<BusBudget> budget;
     uint64_t reserved_bytes = 0;
-    ~BusEvent() { if (budget) budget->release(reserved_bytes); }
+    ASResourcePermit *permit = nullptr;
+    ~BusEvent() {
+        as_resource_permit_release(permit);
+        if (budget) budget->release(reserved_bytes);
+    }
 };
 
 struct BusCursor {
@@ -49,12 +54,16 @@ struct BusCursor {
 
 struct BusTopic {
     explicit BusTopic(ASBusTopicConfig options, uint32_t subscriber_limit,
-                      std::shared_ptr<BusBudget> budget_ref)
+                      std::shared_ptr<BusBudget> budget_ref,
+                      ASResourceGovernor *shared_governor)
         : config(options), limit(subscriber_limit), budget(std::move(budget_ref)),
+          governor(as_resource_governor_retain(shared_governor)),
           slots(options.capacity) {}
+    ~BusTopic() { as_resource_governor_destroy(governor); }
     const ASBusTopicConfig config;
     const uint32_t limit;
     std::shared_ptr<BusBudget> budget;
+    ASResourceGovernor *governor = nullptr;
     bool closed = false;
     std::mutex mutex;
     std::vector<std::shared_ptr<const BusEvent>> slots;
@@ -68,10 +77,13 @@ struct BusTopic {
 };
 
 struct ASBus {
-    explicit ASBus(ASBusConfig cfg)
-        : config(cfg), budget(std::make_shared<BusBudget>(256ull * 1024ull * 1024ull)) {}
+    explicit ASBus(ASBusConfig cfg, ASResourceGovernor *g = nullptr)
+        : config(cfg), budget(std::make_shared<BusBudget>(256ull * 1024ull * 1024ull)),
+          governor(as_resource_governor_retain(g)) {}
+    ~ASBus() { as_resource_governor_destroy(governor); }
     ASBusConfig config;
     std::shared_ptr<BusBudget> budget;
+    ASResourceGovernor *governor = nullptr;
     std::mutex mutex;
     std::unordered_map<uint32_t, std::shared_ptr<BusTopic>> topics;
 };

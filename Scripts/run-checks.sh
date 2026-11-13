@@ -1,9 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 cd "$(dirname "$0")/.."
-cmake -S Kernel -B build-native -DCMAKE_BUILD_TYPE=Release -DAEROSPATIAL_BUILD_BUS_BENCHMARK=ON
+python3 Scripts/check-layout.py
+cmake -S Kernel -B build-native -DCMAKE_BUILD_TYPE=Release -DAEROSPATIAL_BUILD_BUS_BENCHMARK=ON -DAEROSPATIAL_BUILD_SOAK=ON -DAEROSPATIAL_BUILD_FUZZ_SMOKE=ON
 cmake --build build-native --parallel
 ctest --test-dir build-native --output-on-failure
+./build-native/aerospatial-fuzz-smoke
+./build-native/aerospatial-soak 25000
 PYTHONPATH=. python3 -m aerospatial_tools.soak ./build-native/aerospatial-bus-bench \
     --count 20000 --payload 1024 --readers 4 --repeats 2
 swift test

@@ -20,6 +20,16 @@ The foundation combines three languages deliberately:
 
 > **Developer preview / ongoing foundation development.** Core Swift+C++ tests, C++ tests, and Python offline tests have been executed in a Linux environment. The iOS application has passed automated Xcode simulator and DJI-SDK-linked compilation in earlier CI runs; physical-device execution has not been verified. No actual AirPods stream, DJI SDK binary, Mavic Air 2 connection, or aircraft command has been validated here. Real gimbal actuation is **disabled in the standard build**. See [hardware acceptance](Docs/Safety/HARDWARE_TEST_PLAN.md).
 
+## Native C++ reliability and verification
+
+The optional native payload governor enforces shared memory budgets across
+bus events, memory leases and queued work. Native clock validation requires
+an independent mapping of time domains; C ABI capabilities are versioned.
+Extended checks include libFuzzer, ThreadSanitizer, resource soak,
+pipeline latency reports and estimator covariance consistency.
+See [native runtime quality](Docs/Development/NATIVE_QUALITY.md).
+Hardware acceptance remains a separate requirement.
+
 ## High-throughput multimodal bus
 
 The foundation now ships an in-process **C++17 bounded pub/sub data plane** for

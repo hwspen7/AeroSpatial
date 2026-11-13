@@ -1,6 +1,7 @@
 #ifndef AEROSPATIAL_ESTIMATION_H
 #define AEROSPATIAL_ESTIMATION_H
 #include "aerospatial_native.h"
+#include <stdint.h>
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -58,6 +59,26 @@ ASStatus as_inertial_predict(ASInertialState *state, double time_s,
    On a gated outlier the state is unchanged. No flight-control output. */
 ASStatus as_inertial_update_position(ASInertialState *state, ASVector3 position_enu_m,
                                      double position_std_m, double maximum_nis, double *nis_out);
+
+
+/* Read-only numerical consistency diagnostics, not hardware ground truth.
+   Covariance is 15x15 row-major and must be positive definite within tolerance.
+   valid is zero for nonfinite/asymmetric/indefinite covariance or bad quaternion.
+   AS_OK means the diagnostic completed, NOT that the covariance passed. */
+typedef struct {
+    uint32_t valid;
+    double trace;
+    double minimum_variance;
+    double maximum_variance;
+    double maximum_asymmetry;
+    double quaternion_norm_error;
+} ASCovarianceQuality;
+ASStatus as_inertial_covariance_quality(const ASInertialState *state,
+                                        double tolerance, ASCovarianceQuality *out);
+/* 3D position NEES against an independently supplied ENU truth position.
+   Inverse uses the actual full upper-left 3x3 covariance, not diagonal only. */
+ASStatus as_inertial_position_nees(const ASInertialState *state,
+                                   ASVector3 truth_enu_m, double *nees_out);
 
 #ifdef __cplusplus
 }
