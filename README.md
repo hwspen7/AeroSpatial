@@ -18,7 +18,7 @@ The foundation combines three languages deliberately:
 - **C++17** implements deterministic, platform-neutral numerical primitives behind a stable C interface. Its source builds both through Swift Package Manager and standalone CMake, without DJI dependencies.
 - **Python** provides offline log verification, reproducible scenarios, diagnostic metrics, cross-language parity checks, and an opt-in local SQLite spatial observation store.
 
-> **Developer preview / ongoing foundation development.** Core Swift+C++ tests, C++ tests, and Python offline tests have been executed in a Linux environment. The iOS application has been **syntax-parsed only**, not compiled or run with Xcode. No actual AirPods stream, DJI SDK binary, Mavic Air 2 connection, or aircraft command has been validated here. Real gimbal actuation is **disabled in the standard build**. See [hardware acceptance](Docs/HARDWARE_TEST_PLAN.md).
+> **Developer preview / ongoing foundation development.** Core Swift+C++ tests, C++ tests, and Python offline tests have been executed in a Linux environment. The iOS application has passed automated Xcode simulator and DJI-SDK-linked compilation in earlier CI runs; physical-device execution has not been verified. No actual AirPods stream, DJI SDK binary, Mavic Air 2 connection, or aircraft command has been validated here. Real gimbal actuation is **disabled in the standard build**. See [hardware acceptance](Docs/Safety/HARDWARE_TEST_PLAN.md).
 
 ## High-throughput multimodal bus
 
@@ -31,19 +31,19 @@ payload without per-subscriber copies. Swift owns lifecycle/typed app ingress;
 Python can audit portable metadata envelopes without loading video payloads.
 
 This is a **tested transport foundation**, not a live DJI video decoder or
-flight control mechanism. See [bus engineering contract](Docs/MULTIMODAL_BUS.md).
+flight control mechanism. See [bus engineering contract](Docs/Architecture/MULTIMODAL_BUS.md).
 
 
 ## Algorithm development foundation
 
 The optional-compute layer now includes a bounded **C++ admission governor**, pinhole camera rays and reference-plane geometry, deterministic Swift/Python algorithm dependency manifests, explicit device-capability checks, an offline Python execution harness, causal-span tracing, immutable optical calibration metadata, and synchronized head/video/telemetry metadata bundles.
 
-All optional algorithms are prohibited from publishing head or aircraft telemetry source streams. Neither the compute governor nor the plugin runtime authorizes flight control. Real DJI video, inference and device calibration remain unverified. Read [the algorithm contract](Docs/ALGORITHM_PLATFORM.md) and [development matrix](Docs/DEVELOPMENT_TRACKS.md).
+All optional algorithms are prohibited from publishing head or aircraft telemetry source streams. Neither the compute governor nor the plugin runtime authorizes flight control. Real DJI video, inference and device calibration remain unverified. Read [the algorithm contract](Docs/Architecture/ALGORITHM_PLATFORM.md) and [development matrix](Docs/Development/DEVELOPMENT_TRACKS.md).
 
 ```bash
-PYTHONPATH=Toolkit python3 -m aerospatial_tools algorithms Fixtures/algorithms.json
-PYTHONPATH=Toolkit python3 -m aerospatial_tools trace-audit Fixtures/traces.jsonl
-PYTHONPATH=Toolkit python3 -m aerospatial_tools workload --samples 3000 --seed 42
+PYTHONPATH=. python3 -m aerospatial_tools algorithms Fixtures/algorithms.json
+PYTHONPATH=. python3 -m aerospatial_tools trace-audit Fixtures/traces.jsonl
+PYTHONPATH=. python3 -m aerospatial_tools workload --samples 3000 --seed 42
 ```
 
 
@@ -56,7 +56,7 @@ SDK-conditional encoded H.264 callback receiver, fixed-capacity off-main
 transport, and a bounded native Annex-B NAL parser. **NAL units are not decoded
 frames**, and capture timestamps, SDK linking and hardware remain unverified.
 For portable tests and separate physical acceptance gates, see
-[P0 acceptance](Docs/P0_ACCEPTANCE.md).
+[P0 acceptance](Docs/Validation/P0_ACCEPTANCE.md).
 
 
 ## Spatial estimation and metric geometry (P1)
@@ -74,12 +74,12 @@ These are **portable software components**, not a claimed flight-validated
 inertial navigation or live SLAM system. Monocular translation has unknown
 scale unless external metric evidence fixes it; raw inertial samples and
 real camera calibration have not been verified on Mavic Air 2. See
-[math and coordinate contracts](Docs/P1_SPATIAL_ESTIMATION.md) and
-[the P1 acceptance matrix](Docs/P1_ACCEPTANCE.md).
+[math and coordinate contracts](Docs/Architecture/P1_SPATIAL_ESTIMATION.md) and
+[the P1 acceptance matrix](Docs/Validation/P1_ACCEPTANCE.md).
 
 ```bash
-python -m pip install -e './Toolkit[mapping]'
-PYTHONPATH=Toolkit python -m aerospatial_tools spatial-demo --seed 42
+python -m pip install -e '.[mapping]'
+PYTHONPATH=. python -m aerospatial_tools spatial-demo --seed 42
 ```
 
 ## P3 offline integration and safe sharing
@@ -92,20 +92,20 @@ session export in the iOS app. The UI now exposes actual ingress/drop counters
 and device thermal state. These are portable/offline integrations, not
 live DJI/AirPods SLAM or a verified physical hardware deployment.
 
-See [P3 integration contract](Docs/P3_INTEGRATION.md) and
-[P3 acceptance matrix](Docs/P3_ACCEPTANCE.md).
+See [P3 integration contract](Docs/Development/P3_INTEGRATION.md) and
+[P3 acceptance matrix](Docs/Validation/P3_ACCEPTANCE.md).
 
 ```sh
-PYTHONPATH=Toolkit python -m aerospatial_tools video-evidence --help
-PYTHONPATH=Toolkit python -m aerospatial_tools evidence-gate --help
+PYTHONPATH=. python -m aerospatial_tools video-evidence --help
+PYTHONPATH=. python -m aerospatial_tools evidence-gate --help
 ```
 
 ## C++ video and real-time strengthening
 
-The C++ foundation now assembles H.264 **access units** from arbitrarily split DJI SDK Annex-B callback chunks (with IDR resynchronization and SPS/PPS provenance), rather than treating each NAL as a decoded picture. A bounded native deadline/priority work queue separates optional video work from the SwiftUI run loop. iOS CoreMedia/VideoToolbox receives complete AVCC samples and exposes decoded `CVPixelBuffer` to an optional model consumer. Control cadence uses a dedicated monotonic scheduler and measures delivery jitter; the safety state machine remains separately authorized. See [native video and runtime contract](Docs/CPP_VIDEO_RUNTIME.md). None of these portable tests establish real DJI camera timestamps, device decoding performance or airworthiness.
+The C++ foundation now assembles H.264 **access units** from arbitrarily split DJI SDK Annex-B callback chunks (with IDR resynchronization and SPS/PPS provenance), rather than treating each NAL as a decoded picture. A bounded native deadline/priority work queue separates optional video work from the SwiftUI run loop. iOS CoreMedia/VideoToolbox receives complete AVCC samples and exposes decoded `CVPixelBuffer` to an optional model consumer. Control cadence uses a dedicated monotonic scheduler and measures delivery jitter; the safety state machine remains separately authorized. See [native video and runtime contract](Docs/Development/CPP_VIDEO_RUNTIME.md). None of these portable tests establish real DJI camera timestamps, device decoding performance or airworthiness.
 
 The native video ingestion and optional CPU execution freeze candidate is
-reviewed in [Native Freeze Review](Docs/NATIVE_FREEZE_REVIEW.md), including
+reviewed in [Native Freeze Review](Docs/Validation/NATIVE_FREEZE_REVIEW.md), including
 explicit remaining hardware acceptance conditions.
 
 ## Architecture
@@ -169,7 +169,7 @@ final record after restart, but rejects checksum damage or corruption in a prior
 segment. The generic core is aircraft-agnostic; the experimental DJI adapter
 currently targets **Mavic Air 2**, not **DJI Air 2S**. Device compatibility, video
 ingress and gimbal behavior still require real hardware verification. See
-[the P0 acceptance document](Docs/RUNTIME_FOUNDATION.md).
+[the P0 acceptance document](Docs/Architecture/RUNTIME_FOUNDATION.md).
 
 ### Deliberately not claimed
 
@@ -177,12 +177,14 @@ AeroSpatial does **not** currently implement live drone video decoding, visual o
 
 ## Repository layout
 
+The repository enforces a maximum of two directory levels for tracked files. See [the layout contract](Docs/SOURCE_LAYOUT.md).
+
 ```text
 AeroSpatial/
 ├── Core/              # Swift algorithms, state machines and sensor fusion
 ├── Kernel/            # C++ numerical kernel, C ABI, CMake and microbenchmarks
 ├── App/               # iOS services and SwiftUI (at most two levels deep)
-├── Toolkit/           # Offline data, memory, analysis and replay utilities
+├── aerospatial_tools/ # Grouped, installable offline Python modules
 ├── Tests/             # Swift portable tests
 ├── NativeTests/       # C++ numerical tests
 ├── ToolkitTests/      # Offline and cross-language validation
@@ -222,14 +224,14 @@ cmake --build build-native --parallel
 ctest --test-dir build-native --output-on-failure
 
 # Python without any third-party runtime dependencies
-PYTHONPATH=Toolkit python3 -m unittest discover -s ToolkitTests -v
-PYTHONPATH=Toolkit python3 -m aerospatial_tools simulate /tmp/sample-flight.jsonl --seconds 30 --seed 7
-PYTHONPATH=Toolkit python3 -m aerospatial_tools report /tmp/sample-flight.jsonl
-PYTHONPATH=Toolkit python3 -m aerospatial_tools audit /tmp/sample-flight.jsonl
-PYTHONPATH=Toolkit python3 -m aerospatial_tools gate /tmp/sample-flight.jsonl \
+PYTHONPATH=. python3 -m unittest discover -s ToolkitTests -v
+PYTHONPATH=. python3 -m aerospatial_tools simulate /tmp/sample-flight.jsonl --seconds 30 --seed 7
+PYTHONPATH=. python3 -m aerospatial_tools report /tmp/sample-flight.jsonl
+PYTHONPATH=. python3 -m aerospatial_tools audit /tmp/sample-flight.jsonl
+PYTHONPATH=. python3 -m aerospatial_tools gate /tmp/sample-flight.jsonl \
   --profile Quality/simulator.json
 swift run aerospatial-scenario /tmp/swift-loop.jsonl 5 42 2
-PYTHONPATH=Toolkit python3 -m aerospatial_tools validate /tmp/swift-loop.jsonl
+PYTHONPATH=. python3 -m aerospatial_tools validate /tmp/swift-loop.jsonl
 ```
 
 For Windows, `Scripts/Run-Checks.ps1` runs the **C++ and Python** suites. The native Swift package is supported on Linux/macOS; compiling the iOS app requires a Mac.
@@ -238,14 +240,14 @@ For Windows, `Scripts/Run-Checks.ps1` runs the **C++ and Python** suites. The na
 
 ```bash
 # Data stays in a local SQLite file. No cloud account required.
-PYTHONPATH=Toolkit python3 -m aerospatial_tools memory add \
+PYTHONPATH=. python3 -m aerospatial_tools memory add \
   --db local-memory.sqlite3 --lat 40.0 --lon -83.0 \
   --label "Camera observation point"
 
-PYTHONPATH=Toolkit python3 -m aerospatial_tools memory nearby \
+PYTHONPATH=. python3 -m aerospatial_tools memory nearby \
   --db local-memory.sqlite3 --lat 40.0 --lon -83.0 --radius 200
 
-PYTHONPATH=Toolkit python3 -m aerospatial_tools memory import \
+PYTHONPATH=. python3 -m aerospatial_tools memory import \
   --db local-memory.sqlite3 --session Fixtures/session.jsonl
 ```
 
@@ -255,17 +257,17 @@ Import is idempotent for versioned `spatial_marker` events. The marker represent
 
 ```bash
 # Sharing is explicit. Original GPS-bearing session is never overwritten.
-PYTHONPATH=Toolkit python3 -m aerospatial_tools sanitize /tmp/sample-flight.jsonl /tmp/share.jsonl
-PYTHONPATH=Toolkit python3 -m aerospatial_tools digest create /tmp/share.jsonl /tmp/share.sha256.json
-PYTHONPATH=Toolkit python3 -m aerospatial_tools digest verify /tmp/share.jsonl /tmp/share.sha256.json
+PYTHONPATH=. python3 -m aerospatial_tools sanitize /tmp/sample-flight.jsonl /tmp/share.jsonl
+PYTHONPATH=. python3 -m aerospatial_tools digest create /tmp/share.jsonl /tmp/share.sha256.json
+PYTHONPATH=. python3 -m aerospatial_tools digest verify /tmp/share.jsonl /tmp/share.sha256.json
 
 # Test that integrity and quality checks reject damaged traces.
-PYTHONPATH=Toolkit python3 -m aerospatial_tools inject-fault \
+PYTHONPATH=. python3 -m aerospatial_tools inject-fault \
   /tmp/sample-flight.jsonl /tmp/stale-head.jsonl --fault stale_head
-PYTHONPATH=Toolkit python3 -m aerospatial_tools audit /tmp/stale-head.jsonl
+PYTHONPATH=. python3 -m aerospatial_tools audit /tmp/stale-head.jsonl
 ```
 
-The sanitization pass strips recognized GPS-coordinate keys, notes, identifying session IDs and original wall times. It **cannot guarantee** that custom numeric fields are non-identifying. Inspect any exported data before publishing. See [data governance](Docs/DATA_GOVERNANCE.md).
+The sanitization pass strips recognized GPS-coordinate keys, notes, identifying session IDs and original wall times. It **cannot guarantee** that custom numeric fields are non-identifying. Inspect any exported data before publishing. See [data governance](Docs/Safety/DATA_GOVERNANCE.md).
 
 ### A typed foundation for future computer vision
 
@@ -293,7 +295,7 @@ with PerceptionStore(Path("observations.sqlite3")) as store:
 
 ### DJI adapter: experimental, off by default
 
-DJI Mavic Air 2 is a DJI Mobile SDK V4 family device, but current iOS/Xcode/firmware compatibility is **not independently established** by these source files. To try linking it, provide your own DJI developer App Key and CocoaPods dependencies and open the generated `.xcworkspace`. **The normal build never transmits gimbal pitch commands**. A dedicated compile-time flag `AEROSPATIAL_EXPERIMENTAL_BENCH` is reserved for a supervised **propeller-removed, nonflying** hardware bench experiment and must not be enabled in a shipping build. Follow every gate in [the hardware plan](Docs/HARDWARE_TEST_PLAN.md). Do not use the bench build in flight.
+DJI Mavic Air 2 is a DJI Mobile SDK V4 family device, but current iOS/Xcode/firmware compatibility is **not independently established** by these source files. To try linking it, provide your own DJI developer App Key and CocoaPods dependencies and open the generated `.xcworkspace`. **The normal build never transmits gimbal pitch commands**. A dedicated compile-time flag `AEROSPATIAL_EXPERIMENTAL_BENCH` is reserved for a supervised **propeller-removed, nonflying** hardware bench experiment and must not be enabled in a shipping build. Follow every gate in [the hardware plan](Docs/Safety/HARDWARE_TEST_PLAN.md). Do not use the bench build in flight.
 
 The included `DJIAdapter.swift` is unverified integration code, not a certification that an Mavic Air 2 firmware version permits all camera axes or accepts the current SDK signatures. Aircraft flight commands are absent.
 
@@ -306,7 +308,7 @@ The included `DJIAdapter.swift` is unverified integration code, not a certificat
 - **Local-only by default:** raw recordings can contain sensitive GPS coordinates and must not be committed or shared without review. The foundation includes an explicit privacy-reduced export; neither flight audio nor onboard video is uploaded by the tools.
 - **Small files / narrow responsibilities:** new modules should normally stay under ~200 source lines, with separate tests for geometry, timing, controls, diagnostics and storage.
 
-See [architecture](Docs/ARCHITECTURE.md), [extension interfaces](Docs/EXTENDING.md), [coordinate frames](Docs/SPATIAL_FRAMES.md), [command safety](Docs/COMMAND_SAFETY.md), [quality gates](Docs/QUALITY_GATES.md), [data governance](Docs/DATA_GOVERNANCE.md), [event protocol](Docs/EVENT_PROTOCOL.md), [test matrix](Docs/TEST_MATRIX.md) and [roadmap](Docs/ROADMAP.md).
+See [architecture](Docs/Architecture/ARCHITECTURE.md), [extension interfaces](Docs/Development/EXTENDING.md), [coordinate frames](Docs/Architecture/SPATIAL_FRAMES.md), [command safety](Docs/Safety/COMMAND_SAFETY.md), [quality gates](Docs/Safety/QUALITY_GATES.md), [data governance](Docs/Safety/DATA_GOVERNANCE.md), [event protocol](Docs/Architecture/EVENT_PROTOCOL.md), [test matrix](Docs/Reports/TEST_MATRIX.md) and [roadmap](Docs/Development/ROADMAP.md).
 
 ## Independent project
 
@@ -331,10 +333,10 @@ swift run -c release aerospatial-bench 100000
 cmake -S Kernel -B build-native -DCMAKE_BUILD_TYPE=Release -DAEROSPATIAL_BUILD_BENCHMARKS=ON
 cmake --build build-native --parallel
 ./build-native/aerospatial-bench 500000
-PYTHONPATH=Toolkit python3 -m aerospatial_tools benchmark --count 100000 --iterations 5
+PYTHONPATH=. python3 -m aerospatial_tools benchmark --count 100000 --iterations 5
 ```
 
-See [performance contract and measurement methodology](Docs/PERFORMANCE.md).
+See [performance contract and measurement methodology](Docs/Development/PERFORMANCE.md).
 
 ## Foundation reliability audit
 
@@ -343,11 +345,11 @@ cached publisher handles, explicit shutdown semantics, and concurrent budget
 regression tests. The metadata-only Swift timeline enforces explicit clock
 normalization with uncertainty-aware alignment. Offline stream audits distinguish
 initial subscriber gaps from later transport gaps. See
-[Engineering audit](Docs/ENGINEERING_AUDIT.md) for resolved and outstanding risks.
+[Engineering audit](Docs/Validation/ENGINEERING_AUDIT.md) for resolved and outstanding risks.
 
 UI source files live directly under `App/`. Native public headers remain under
 `Kernel/include/` because Swift Package Manager requires that public header path.
-The Python package remains under `Toolkit/aerospatial_tools/` for importability.
+The Python package remains under `aerospatial_tools/` for importability.
 Neither the bus nor the timeline issues flight commands. Hardware validation is pending.
 
 ## Durable streams and cross-language diagnostics
@@ -357,14 +359,14 @@ backpressure, strict stream sequencing and fast cached publisher handles. New op
 transport utilities add a 44-byte CRC-checked head-motion record and a bounded
 segmented append-only journal, both accessible from Swift and Python tooling.
 
-`Core/VideoIngress.swift` validates a caller-provided **encoded** video frame's size,
+`Core/Video/VideoIngress.swift` validates a caller-provided **encoded** video frame's size,
 codec, clock domain and capture timestamp before publishing. It does **not** decode
 DJI video or establish a live video source. Frame observations can be associated
 with trusted video evidence within explicit time uncertainty, but no automatic
 geolocation of visual targets is claimed.
 
-See [all 20 acceptance items](Docs/INTEGRATION_ACCEPTANCE.md) and
-[wire/storage contracts](Docs/STORAGE_PROTOCOL.md). Physical hardware and full
+See [all 20 acceptance items](Docs/Validation/INTEGRATION_ACCEPTANCE.md) and
+[wire/storage contracts](Docs/Safety/STORAGE_PROTOCOL.md). Physical hardware and full
 Xcode/iOS integration gates remain open and must be verified before any aircraft use.
 
 ## Numerical foundation and offline vision
@@ -378,17 +380,17 @@ These algorithms do **not** infer precise GPS positions or control flight.
 
 ```bash
 # Optional capabilities (not needed for the portable core)
-python -m pip install -e './Toolkit[vision,privacy]'
-PYTHONPATH=Toolkit python -m aerospatial_tools video-probe path/to/local-video.mp4
-PYTHONPATH=Toolkit python -m aerospatial_tools vision-match reference.jpg revisit.jpg
+python -m pip install -e '.[vision,privacy]'
+PYTHONPATH=. python -m aerospatial_tools video-probe path/to/local-video.mp4
+PYTHONPATH=. python -m aerospatial_tools vision-match reference.jpg revisit.jpg
 ```
 
-See [Mathematical foundation](Docs/MATHEMATICAL_FOUNDATION.md) and
-[acceptance review](Docs/ACCEPTANCE_REVIEW.md).
+See [Mathematical foundation](Docs/Architecture/MATHEMATICAL_FOUNDATION.md) and
+[acceptance review](Docs/Validation/ACCEPTANCE_REVIEW.md).
 
 ## Portable runtime hardening
 
-The observation-only P0 building blocks add a bounded real-time mailbox, native atomic latency histogram, uncertainty-aware clock registry, device-evidence expiration, fail-closed safety assessment, encoded-frame routing, and asynchronous CRC-framed journal writes. See [runtime acceptance and remaining hardware gates](Docs/RUNTIME_FOUNDATION.md). These are portable components, **not** a claim of completed DJI/iPhone hardware integration.
+The observation-only P0 building blocks add a bounded real-time mailbox, native atomic latency histogram, uncertainty-aware clock registry, device-evidence expiration, fail-closed safety assessment, encoded-frame routing, and asynchronous CRC-framed journal writes. See [runtime acceptance and remaining hardware gates](Docs/Architecture/RUNTIME_FOUNDATION.md). These are portable components, **not** a claim of completed DJI/iPhone hardware integration.
 
 The application now forwards head and telemetry publications through `SpatialIngressPublisher` on a utility worker and writes its legacy JSONL sessions through a bounded asynchronous writer. This does not constitute a complete VideoToolbox/DJI hardware integration or a finished segment-journal UI migration.
 
@@ -402,5 +404,5 @@ conservative derived-log retention and ROS2-compatible pose serialization.
 
 These are reusable implementation components, not a claim that Mavic Air 2
 hardware, live Core ML execution, ROS2 networking, georeferencing or flight
-safety has been certified. See [P2 architecture](Docs/P2_PLATFORM.md) and
-[P2 acceptance](Docs/P2_ACCEPTANCE.md) for the precise boundaries and test gates.
+safety has been certified. See [P2 architecture](Docs/Development/P2_PLATFORM.md) and
+[P2 acceptance](Docs/Validation/P2_ACCEPTANCE.md) for the precise boundaries and test gates.
