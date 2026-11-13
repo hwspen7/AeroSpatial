@@ -19,7 +19,7 @@ int main() {
             AS_CLOCK_UNCERTAIN);
     REQUIRE(as_clock_quality_observe(q, AS_CLOCK_AIRPODS, 200, 12000, 12050, 10, &report) ==
             AS_CLOCK_JUMP);
-    REQUIRE(as_clock_quality_observe(q, AS_CLOCK_AIRPODS, 200, 10100, 11001, 10, &report) ==
+    REQUIRE(as_clock_quality_observe(q, AS_CLOCK_AIRPODS, 200, 10100, 11101, 10, &report) ==
             AS_CLOCK_STALE);
     REQUIRE(as_clock_quality_observe(q, AS_CLOCK_AIRPODS, 200, 10100, 10200, 10, &report) ==
             AS_CLOCK_ACCEPTED);
