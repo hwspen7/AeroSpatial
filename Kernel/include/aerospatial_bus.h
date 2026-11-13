@@ -93,6 +93,10 @@ typedef struct {
    Destroying the same handle concurrently with its use is not supported.
    Once drained, subscriptions return ASBUS_CLOSED after parent destruction. */
 ASBus *as_bus_create(const ASBusConfig *config);
+/* Opt-in shared budget; returned leases remain charged until final release. */
+struct ASResourceGovernor;
+ASBus *as_bus_create_budgeted(const ASBusConfig *config,
+                               struct ASResourceGovernor *governor);
 void as_bus_destroy(ASBus *bus);
 ASBusStatus as_bus_add_topic(ASBus *bus, ASBusTopicConfig config);
 /* Sets a global payload budget before adding topics. */

@@ -19,6 +19,10 @@ typedef struct {
 /// retaining a lease does not copy. Lease data is immutable for its lifetime.
 /// Destroying the pool prevents further insertion but existing leases survive.
 ASMemoryPool *as_memory_pool_create(size_t maximum_bytes, size_t maximum_payload_bytes);
+struct ASResourceGovernor;
+ASMemoryPool *as_memory_pool_create_budgeted(size_t maximum_bytes,
+                                              size_t maximum_payload_bytes,
+                                              struct ASResourceGovernor *governor);
 void as_memory_pool_destroy(ASMemoryPool *pool);
 ASMemoryLease *as_memory_pool_copy(ASMemoryPool *pool, const uint8_t *bytes, size_t length);
 ASMemoryLease *as_memory_lease_retain(const ASMemoryLease *lease);
